@@ -1,0 +1,27 @@
+{
+  "name": "@babel/plugin-syntax-generator-literals",
+  "version": "7.0.0",
+  "description": "Allow parsing of generator literals.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MaxMotovilov/babel-tc39-generator-literals.git",
+    "directory": "packages/babel-plugin-syntax-generator-literals"
+  },
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "main": "lib/index.js",
+  "keywords": [
+    "babel-plugin"
+  ],
+  "dependencies": {
+    "@babel/helper-plugin-utils": "workspace:^7.10.4"
+  },
+  "peerDependencies": {
+    "@babel/core": "^7.0.0"
+  },
+  "devDependencies": {
+    "@babel/core": "workspace:*"
+  }
+}

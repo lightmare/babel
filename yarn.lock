@@ -1658,6 +1658,17 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@babel/plugin-syntax-generator-literals@workspace:packages/babel-plugin-syntax-generator-literals":
+  version: 0.0.0-use.local
+  resolution: "@babel/plugin-syntax-generator-literals@workspace:packages/babel-plugin-syntax-generator-literals"
+  dependencies:
+    "@babel/core": "workspace:*"
+    "@babel/helper-plugin-utils": "workspace:^7.10.4"
+  peerDependencies:
+    "@babel/core": ^7.0.0
+  languageName: unknown
+  linkType: soft
+
 "@babel/plugin-syntax-import-assertions@workspace:*, @babel/plugin-syntax-import-assertions@workspace:packages/babel-plugin-syntax-import-assertions":
   version: 0.0.0-use.local
   resolution: "@babel/plugin-syntax-import-assertions@workspace:packages/babel-plugin-syntax-import-assertions"
