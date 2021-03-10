@@ -94,6 +94,7 @@ export const types: { [name: string]: TokenType } = {
 
   // Punctuation token types.
   bracketL: new TokenType("[", { beforeExpr, startsExpr }),
+  bracketStarL: new TokenType("*[", { beforeExpr, startsExpr }),
   bracketHashL: new TokenType("#[", { beforeExpr, startsExpr }),
   bracketBarL: new TokenType("[|", { beforeExpr, startsExpr }),
   bracketR: new TokenType("]"),

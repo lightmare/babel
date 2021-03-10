@@ -409,6 +409,11 @@ export type TupleExpression = NodeBase & {
   elements: $ReadOnlyArray<?(Expression | SpreadElement)>,
 };
 
+export type GeneratorExpression = NodeBase & {
+  type: "GeneratorExpression",
+  elements: $ReadOnlyArray<?(Expression | SpreadElement)>,
+};
+
 export type ObjectExpression = NodeBase & {
   type: "ObjectExpression",
   properties: $ReadOnlyArray<ObjectProperty | ObjectMethod | SpreadElement>,

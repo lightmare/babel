@@ -498,6 +498,20 @@ export default class Tokenizer extends ParserErrors {
     return true;
   }
 
+  readToken_star(code: number): void {
+    // '*['
+    if (
+      this.input.charCodeAt(this.state.pos + 1) ===
+        charCodes.leftSquareBracket &&
+      this.hasPlugin("generatorLiteral")
+    ) {
+      this.finishToken(tt.bracketStarL);
+      this.state.pos += 2;
+    } else {
+      this.readToken_mult_modulo(code);
+    }
+  }
+
   readToken_mult_modulo(code: number): void {
     // '%*'
     let type = code === charCodes.asterisk ? tt.star : tt.modulo;
@@ -854,8 +868,11 @@ export default class Tokenizer extends ParserErrors {
         this.readToken_slash();
         return;
 
-      case charCodes.percentSign:
       case charCodes.asterisk:
+        this.readToken_star(code);
+        return;
+
+      case charCodes.percentSign:
         this.readToken_mult_modulo(code);
         return;
 

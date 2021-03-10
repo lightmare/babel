@@ -1086,6 +1086,16 @@ export default class ExpressionParser extends LValParser {
           this.state.type === tt.bracketBarL ? tt.bracketBarR : tt.bracketR,
           /* canBePattern */ false,
           /* isTuple */ true,
+          /* isGenerator */ false,
+          refExpressionErrors,
+        );
+      }
+      case tt.bracketStarL: {
+        return this.parseArrayLike(
+          tt.bracketR,
+          /* canBePattern */ false,
+          /* isTuple */ false,
+          /* isGenerator */ true,
           refExpressionErrors,
         );
       }
@@ -1094,6 +1104,7 @@ export default class ExpressionParser extends LValParser {
           tt.bracketR,
           /* canBePattern */ true,
           /* isTuple */ false,
+          /* isGenerator */ false,
           refExpressionErrors,
         );
       }
@@ -2023,10 +2034,14 @@ export default class ExpressionParser extends LValParser {
     close: TokenType,
     canBePattern: boolean,
     isTuple: boolean,
+    isGenerator: boolean,
     refExpressionErrors: ?ExpressionErrors,
-  ): N.ArrayExpression | N.TupleExpression {
+  ): N.ArrayExpression | N.TupleExpression | N.GeneratorExpression {
     if (isTuple) {
       this.expectPlugin("recordAndTuple");
+    }
+    if (isGenerator) {
+      this.expectPlugin("generatorLiteral");
     }
     const oldInFSharpPipelineDirectBody = this.state.inFSharpPipelineDirectBody;
     this.state.inFSharpPipelineDirectBody = false;
@@ -2041,7 +2056,11 @@ export default class ExpressionParser extends LValParser {
     this.state.inFSharpPipelineDirectBody = oldInFSharpPipelineDirectBody;
     return this.finishNode(
       node,
-      isTuple ? "TupleExpression" : "ArrayExpression",
+      isTuple
+        ? "TupleExpression"
+        : isGenerator
+        ? "GeneratorExpression"
+        : "ArrayExpression",
     );
   }
 
