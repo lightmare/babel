@@ -140,6 +140,7 @@ export type Node =
   | FunctionParent
   | FunctionTypeAnnotation
   | FunctionTypeParam
+  | GeneratorExpression
   | GenericTypeAnnotation
   | Identifier
   | IfStatement
@@ -1612,6 +1613,11 @@ export interface TupleExpression extends BaseNode {
   elements: Array<Expression | SpreadElement>;
 }
 
+export interface GeneratorExpression extends BaseNode {
+  type: "GeneratorExpression";
+  elements: Array<Expression | SpreadElement>;
+}
+
 export interface DecimalLiteral extends BaseNode {
   type: "DecimalLiteral";
   value: string;
@@ -2051,6 +2057,7 @@ export type Expression =
   | DoExpression
   | RecordExpression
   | TupleExpression
+  | GeneratorExpression
   | DecimalLiteral
   | ModuleExpression
   | TSAsExpression

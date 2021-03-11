@@ -3014,6 +3014,23 @@ export function isTupleExpression(
 
   return false;
 }
+export function isGeneratorExpression(
+  node: object | null | undefined,
+  opts?: object | null,
+): node is t.GeneratorExpression {
+  if (!node) return false;
+
+  const nodeType = (node as t.Node).type;
+  if (nodeType === "GeneratorExpression") {
+    if (typeof opts === "undefined") {
+      return true;
+    } else {
+      return shallowEqual(node, opts);
+    }
+  }
+
+  return false;
+}
 export function isDecimalLiteral(
   node: object | null | undefined,
   opts?: object | null,
@@ -4185,6 +4202,7 @@ export function isExpression(
     "DoExpression" === nodeType ||
     "RecordExpression" === nodeType ||
     "TupleExpression" === nodeType ||
+    "GeneratorExpression" === nodeType ||
     "DecimalLiteral" === nodeType ||
     "ModuleExpression" === nodeType ||
     "TSAsExpression" === nodeType ||

@@ -1060,6 +1060,11 @@ export function tupleExpression(
 ): t.TupleExpression {
   return builder("TupleExpression", ...arguments);
 }
+export function generatorExpression(
+  elements?: Array<t.Expression | t.SpreadElement>,
+): t.GeneratorExpression {
+  return builder("GeneratorExpression", ...arguments);
+}
 export function decimalLiteral(value: string): t.DecimalLiteral {
   return builder("DecimalLiteral", ...arguments);
 }

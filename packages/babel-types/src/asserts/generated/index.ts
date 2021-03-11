@@ -1076,6 +1076,12 @@ export function assertTupleExpression(
 ): asserts node is t.TupleExpression {
   assert("TupleExpression", node, opts);
 }
+export function assertGeneratorExpression(
+  node: object | null | undefined,
+  opts?: object | null,
+): asserts node is t.GeneratorExpression {
+  assert("GeneratorExpression", node, opts);
+}
 export function assertDecimalLiteral(
   node: object | null | undefined,
   opts?: object | null,

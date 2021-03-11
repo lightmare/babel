@@ -243,6 +243,20 @@ defineType("TupleExpression", {
   aliases: ["Expression"],
 });
 
+defineType("GeneratorExpression", {
+  fields: {
+    elements: {
+      validate: chain(
+        assertValueType("array"),
+        assertEach(assertNodeType("Expression", "SpreadElement")),
+      ),
+      default: [],
+    },
+  },
+  visitor: ["elements"],
+  aliases: ["Expression"],
+});
+
 defineType("DecimalLiteral", {
   builder: ["value"],
   fields: {

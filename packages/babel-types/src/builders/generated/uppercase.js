@@ -186,6 +186,7 @@ export {
   privateName as PrivateName,
   recordExpression as RecordExpression,
   tupleExpression as TupleExpression,
+  generatorExpression as GeneratorExpression,
   decimalLiteral as DecimalLiteral,
   staticBlock as StaticBlock,
   moduleExpression as ModuleExpression,

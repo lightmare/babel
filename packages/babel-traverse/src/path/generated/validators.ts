@@ -133,6 +133,7 @@ export interface NodePathValidators {
     opts?: object,
   ): this is NodePath<t.FunctionTypeAnnotation>;
   isFunctionTypeParam(opts?: object): this is NodePath<t.FunctionTypeParam>;
+  isGeneratorExpression(opts?: object): this is NodePath<t.GeneratorExpression>;
   isGenericTypeAnnotation(
     opts?: object,
   ): this is NodePath<t.GenericTypeAnnotation>;

@@ -235,6 +235,9 @@ export interface NodePathAssetions {
   assertFunctionTypeParam(
     opts?: object,
   ): asserts this is NodePath<t.FunctionTypeParam>;
+  assertGeneratorExpression(
+    opts?: object,
+  ): asserts this is NodePath<t.GeneratorExpression>;
   assertGenericTypeAnnotation(
     opts?: object,
   ): asserts this is NodePath<t.GenericTypeAnnotation>;
