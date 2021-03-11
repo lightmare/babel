@@ -1194,12 +1194,26 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@babel/plugin-proposal-json-strings@npm:^7.12.13":
-  version: 7.12.13
-  resolution: "@babel/plugin-proposal-json-strings@npm:7.12.13"
+"@babel/plugin-proposal-generator-literals@workspace:packages/babel-plugin-proposal-generator-literals":
+  version: 0.0.0-use.local
+  resolution: "@babel/plugin-proposal-generator-literals@workspace:packages/babel-plugin-proposal-generator-literals"
   dependencies:
-    "@babel/helper-plugin-utils": ^7.12.13
-    "@babel/plugin-syntax-json-strings": ^7.8.0
+    "@babel/core": "workspace:*"
+    "@babel/helper-plugin-test-runner": "workspace:*"
+    "@babel/helper-plugin-utils": "workspace:^7.12.0"
+    "@babel/plugin-syntax-record-and-tuple": "workspace:^7"
+    "@babel/template": "workspace:^7.12.0"
+  peerDependencies:
+    "@babel/core": ^7.12.0
+  languageName: unknown
+  linkType: soft
+
+"@babel/plugin-proposal-json-strings@npm:^7.13.8":
+  version: 7.13.8
+  resolution: "@babel/plugin-proposal-json-strings@npm:7.13.8"
+  dependencies:
+    "@babel/helper-plugin-utils": ^7.13.0
+    "@babel/plugin-syntax-json-strings": ^7.8.3
   peerDependencies:
     "@babel/core": ^7.0.0-0
   checksum: e15d3b598817d951d33fdafc24cb157d4db008d0e26a880d61817214a4adc7946df553dd07c8097901c6b1f33afad661c953d70f3bcbb8b9b28a14d184b7ed5b

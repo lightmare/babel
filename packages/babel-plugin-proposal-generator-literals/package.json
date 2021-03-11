@@ -1,0 +1,31 @@
+{
+  "name": "@babel/plugin-proposal-generator-literals",
+  "version": "7.0.0",
+  "description": "A transform for *[] expressions into generator functions.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MaxMotovilov/babel-tc39-generator-literals.git",
+    "directory": "packages/babel-plugin-proposal-generator-literals"
+  },
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "main": "./lib/index.js",
+  "exports": "./lib/index.js",
+  "keywords": [
+    "babel-plugin"
+  ],
+  "dependencies": {
+    "@babel/helper-plugin-utils": "workspace:^7.12.0",
+    "@babel/plugin-syntax-generator-literals": "workspace:^7",
+    "@babel/template": "workspace:^7.12.0"
+  },
+  "peerDependencies": {
+    "@babel/core": "^7.12.0"
+  },
+  "devDependencies": {
+    "@babel/core": "workspace:*",
+    "@babel/helper-plugin-test-runner": "workspace:*"
+  }
+}
