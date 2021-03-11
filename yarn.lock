@@ -3859,7 +3859,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@rollup/plugin-commonjs@^17.1.0, @rollup/plugin-commonjs@npm:^17.1.0":
+"@rollup/plugin-commonjs@^17.1.0":
   version: 17.1.0
   resolution: "@rollup/plugin-commonjs@npm:17.1.0"
   dependencies:
