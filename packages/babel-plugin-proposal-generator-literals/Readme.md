@@ -50,7 +50,7 @@ The reference implementation presented here performs this exact replacement in B
 ## How to use this repository
 
 0. Prerequisites: Node.js 14+, yarn.
-1. Clone locally.
+1. Clone locally, `git checkout generator-literals`.
 2. In the root folder, run `make bootstrap`
 followed by `make build`.
 3. To run [the tests](./test/fixtures), use `TEST_ONLY=babel-plugin-proposal-generator-literals make test`.
