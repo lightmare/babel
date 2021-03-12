@@ -21,8 +21,10 @@ including [spread](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Refer
 
 *GeneratorLiteral* ::= `*[`( *AssignmentExpression* | *SpreadElement* )`,`...`]`
 
-Adopts the array literal syntax with a distinct leading bracket except for the element
-elision which does not make any sense semantically in this context.
+Adopts the array literal syntax, replacing the leading bracket with a `*[` token which cannot
+appear in any well formed Javascript program at present. The element elision does not make any
+sense semantically in this context and should be disallowed, although the reference implementation
+presented does not perform this check.
 
 ### Semantics
 
@@ -43,7 +45,18 @@ ES6:
 })
 ```
 
-The reference implementation provided here performs this exact replacement in Babel AST.
+The reference implementation presented here performs this exact replacement in Babel AST.
+
+## How to use this repository
+
+0. Prerequisites: Node.js 14+, yarn.
+1. Clone locally.
+2. In the root folder, run `make bootstrap`
+followed by `make build`.
+3. To run [the tests](./test/fixtures), use `TEST_ONLY=babel-plugin-proposal-generator-literals make test`.
+4. To run your own code, use `./node_modules/.bin/babel-node -w @babel/plugin-proposal-generator-literals`.
+Note [this](https://babeljs.io/docs/en/babel-node#es6-style-module-loading-may-not-function-as-expected)
+and other limitations of REPL mode in `babel-node`; `.js` files supplied via command line are not so limited.
 
 ## The orphaned promise problem
 
