@@ -60,21 +60,23 @@ function escapeRegExp(string) {
   return string.replace(/[|\\{}()[\]^$+*?.]/g, "\\$&");
 }
 
+function fixedStringRegExp(string, flags) {
+  return new RegExp(escapeRegExp(string), flags);
+}
+
 const normalizeOutput = function (str, cwd) {
-  let result = str
+  // backslashes and quotes are escaped in string literals, on any platform
+  // (non-ASCII characters / emojis seem to pass through unescaped)
+  const rootDirInLiteral = rootDir.replace(/[\\""]/g, "\\$&");
+  const result = str
     .replace(/\(\d+ms\)/g, "(123ms)")
-    .replace(new RegExp(escapeRegExp(cwd), "g"), "<CWD>")
     // (non-win32) /foo/babel/packages -> <CWD>/packages
     // (win32) C:\foo\babel\packages -> <CWD>\packages
-    .replace(new RegExp(escapeRegExp(rootDir), "g"), "<ROOTDIR>");
-  if (process.platform === "win32") {
-    result = result
-      // C:\\foo\\babel\\packages -> <CWD>\\packages (in js string literal)
-      .replace(
-        new RegExp(escapeRegExp(rootDir.replace(/\\/g, "\\\\")), "g"),
-        "<ROOTDIR>",
-      );
-  }
+    .replace(fixedStringRegExp(cwd, "g"), "<CWD>")
+    .replace(fixedStringRegExp(rootDir, "g"), "<ROOTDIR>")
+    // (non-win32) "/my \"crazy\" dirname/babel/packages" -> "<ROOTDIR>/packages"
+    // (win32) "C:\\foo\\babel\\packages" -> "<ROOTDIR>\\packages"
+    .replace(fixedStringRegExp(rootDirInLiteral, "g"), "<ROOTDIR>");
   return result;
 };
 
