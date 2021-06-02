@@ -357,27 +357,47 @@ function escapeRegExp(string) {
   return string.replace(/[|\\{}()[\]^$+*?.]/g, "\\$&");
 }
 
+function fixedStringRegExp(string, flags?) {
+  return new RegExp(escapeRegExp(string), flags);
+}
+
+function hexEscapeChar(unit: string) {
+  const code = unit.charCodeAt(0).toString(16).toUpperCase();
+  return code.length <= 2
+    ? "\\x" + code.padStart(2, "0")
+    : "\\u" + code.padStart(4, "0");
+}
+
 function normalizeOutput(code, normalizePathSeparator?) {
   const projectRoot = path.resolve(
     path.dirname(fileURLToPath(import.meta.url)),
     "../../../",
   );
+  // backslashes, quotes and non-ASCII characters are escaped in string literals
+  const projectRootInLiteral = projectRoot
+    .replace(/[\\"]/g, "\\$&")
+    .replace(/[\u007F-\uFFFF]/g, hexEscapeChar);
   const cwdSymbol = "<CWD>";
   let result = code
     .trim()
     // (non-win32) /foo/babel/packages -> <CWD>/packages
     // (win32) C:\foo\babel\packages -> <CWD>\packages
-    .replace(new RegExp(escapeRegExp(projectRoot), "g"), cwdSymbol);
+    .replace(fixedStringRegExp(projectRoot, "g"), cwdSymbol)
+    // (non-win32) "/f\xF8\u014D/babel/packages" -> "<CWD>/packages"
+    // (win32) "C:\\f\xF8\u014D\\babel\\packages" -> "<CWD>\\packages"
+    .replace(fixedStringRegExp(projectRootInLiteral, "g"), cwdSymbol);
   if (process.platform === "win32") {
     result = result
+      // with projectRoot == String.raw`C:\foo\babel\packages`
       // C:/foo/babel/packages -> <CWD>/packages
       .replace(
-        new RegExp(escapeRegExp(projectRoot.replace(/\\/g, "/")), "g"),
+        fixedStringRegExp(projectRoot.replace(/\\/g, "/"), "g"),
         cwdSymbol,
       )
-      // C:\\foo\\babel\\packages -> <CWD>\\packages (in js string literal)
+      // with projectRootInLiteral == String.raw`C:\\foo\\babel\\packages`
+      // "C:/foo/babel/packages" -> "<CWD>/packages"
       .replace(
-        new RegExp(escapeRegExp(projectRoot.replace(/\\/g, "\\\\")), "g"),
+        fixedStringRegExp(projectRootInLiteral.replace(/\\\\/g, "/"), "g"),
         cwdSymbol,
       );
     if (normalizePathSeparator) {
