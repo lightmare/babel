@@ -1,6 +1,6 @@
 import testRunner from "@babel/helper-transform-fixture-test-runner";
 import path from "path";
-import { URL } from "url";
+import { URL, fileURLToPath } from "url";
 
 export default function (loc) {
   if (!process.env.BABEL_8_BREAKING) {
@@ -11,14 +11,8 @@ export default function (loc) {
     }
   }
 
-  let fixtures = new URL("./fixtures", loc).pathname;
-  if (process.platform === "win32") {
-    // Remove the leading / before the drive letter
-    // TODO: After dropping Node.js 10 support, use fileURLToPath
-    fixtures = fixtures.slice(1);
-  }
-
-  const name = path.basename(new URL("..", loc).pathname);
+  const fixtures = fileURLToPath(new URL("./fixtures", loc));
+  const name = path.basename(fileURLToPath(new URL("..", loc)));
 
   testRunner(fixtures, name);
 }
