@@ -135,9 +135,14 @@ jobs:
     strategy:
       matrix:
         node-version: [14, 12, 10, 8, 6]
+    defaults:
+      run:
+        working-directory: '🧶 "Knäuel"'
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
+        with:
+          path: '🧶 "Knäuel"'
       - name: Use Node.js latest # Run yarn on latest node
         uses: actions/setup-node@v2-beta
         with:
@@ -163,6 +168,7 @@ jobs:
       - uses: actions/download-artifact@v2
         with:
           name: babel-artifact
+          path: '🧶 "Knäuel"'
       - name: Generate runtime helpers
         run: |
           make build-plugin-transform-runtime-dist
@@ -223,9 +229,14 @@ jobs:
     name: Test on Windows
     needs: build
     runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: 'no emoji Knäuel'
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
+        with:
+          path: 'no emoji Knäuel'
       - name: Use Node.js latest
         uses: actions/setup-node@v2-beta
       - name: Get yarn cache directory path
@@ -240,6 +251,7 @@ jobs:
       - uses: actions/download-artifact@v2
         with:
           name: babel-artifact
+          path: 'no emoji Knäuel'
       - name: Generate runtime helpers
         run: |
           make build-plugin-transform-runtime-dist
