@@ -99,7 +99,8 @@ const assertTest = function (stdout, stderr, opts, cwd) {
 
   const expectStdout = opts.stdout.trim();
   stdout = stdout.trim();
-  stdout = stdout.replace(/\\/g, "/");
+  // replace backslashes with forward slashes on lines without quotes
+  stdout = stdout.replace(/^[^"]*\\[^"]*$/gm, s => s.replace(/\\/g, "/"));
 
   if (opts.stdout) {
     if (opts.stdoutContains) {

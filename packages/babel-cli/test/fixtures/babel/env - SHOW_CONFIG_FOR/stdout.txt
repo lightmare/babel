@@ -57,7 +57,7 @@ config <CWD>/my-config.js
 {
   "sourceType": "script",
   "plugins": [
-    "[Function: (api) => ({/n  name: /"@foo//" + __dirname,/n  visitor ... ]"
+    "[Function: (api) => ({\n  name: \"@foo/\" + __dirname,\n  visitor ... ]"
   ],
   "extends": "./my-extended.js"
 }
