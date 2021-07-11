@@ -1,6 +1,6 @@
-var _privateField = new WeakMap();
+var _privateField = /*#__PURE__*/new WeakMap();
 
-var _privateFieldValue = new WeakMap();
+var _privateFieldValue = /*#__PURE__*/new WeakMap();
 
 class Cl {
   get self() {
@@ -25,8 +25,8 @@ class Cl {
 
 }
 
-var _get_privateFieldValue = function () {
+function _get_privateFieldValue() {
   return babelHelpers.classPrivateFieldGet(this, _privateField);
-};
+}
 
 var cl = new Cl();

@@ -1,6 +1,6 @@
 var results = [];
 
-var _privateFieldValue = new WeakSet();
+var _privateFieldValue = /*#__PURE__*/new WeakSet();
 
 class Foo {
   constructor() {
@@ -16,6 +16,6 @@ class Foo {
 
 }
 
-var _privateFieldValue2 = function _privateFieldValue2() {
+function _privateFieldValue2() {
   return 42;
-};
+}

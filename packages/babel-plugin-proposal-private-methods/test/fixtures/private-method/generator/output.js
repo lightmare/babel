@@ -1,4 +1,4 @@
-var _foo = new WeakSet();
+var _foo = /*#__PURE__*/new WeakSet();
 
 class Cl {
   constructor() {
@@ -11,7 +11,7 @@ class Cl {
 
 }
 
-var _foo2 = function* _foo2() {
+function* _foo2() {
   yield 2;
   return 3;
-};
+}

@@ -2,8 +2,8 @@
   "type": "File",
   "start":0,"end":36,"loc":{"start":{"line":1,"column":0},"end":{"line":1,"column":36}},
   "errors": [
-    "SyntaxError: Topic reference was used in a lexical context without topic binding (1:32)",
-    "SyntaxError: Pipeline is in topic style but does not use topic reference (1:9)"
+    "SyntaxError: Topic reference was used in a lexical context without topic binding. (1:32)",
+    "SyntaxError: Pipeline is in topic style but does not use topic reference. (1:9)"
   ],
   "program": {
     "type": "Program",
@@ -29,6 +29,7 @@
             "expression": {
               "type": "DoExpression",
               "start":9,"end":36,"loc":{"start":{"line":1,"column":9},"end":{"line":1,"column":36}},
+              "async": false,
               "body": {
                 "type": "BlockStatement",
                 "start":12,"end":36,"loc":{"start":{"line":1,"column":12},"end":{"line":1,"column":36}},

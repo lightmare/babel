@@ -1,4 +1,4 @@
-var _getStatus = new WeakSet();
+var _getStatus = /*#__PURE__*/new WeakSet();
 
 class Foo {
   constructor(status) {
@@ -33,6 +33,6 @@ class Foo {
 
 }
 
-var _getStatus2 = function _getStatus2() {
+function _getStatus2() {
   return this.status;
-};
+}

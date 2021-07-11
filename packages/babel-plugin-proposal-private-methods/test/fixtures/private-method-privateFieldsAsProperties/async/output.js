@@ -1,4 +1,4 @@
-var _foo = babelHelpers.classPrivateFieldLooseKey("foo");
+var _foo = /*#__PURE__*/babelHelpers.classPrivateFieldLooseKey("foo");
 
 class Cl {
   constructor() {
@@ -13,6 +13,6 @@ class Cl {
 
 }
 
-var _foo2 = async function _foo2() {
+async function _foo2() {
   return 2;
-};
+}

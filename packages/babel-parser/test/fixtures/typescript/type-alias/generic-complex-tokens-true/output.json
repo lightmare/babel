@@ -22,7 +22,11 @@
             {
               "type": "TSTypeParameter",
               "start":7,"end":39,"loc":{"start":{"line":1,"column":7},"end":{"line":1,"column":39}},
-              "name": "U",
+              "name": {
+                "type": "Identifier",
+                "start":7,"end":8,"loc":{"start":{"line":1,"column":7},"end":{"line":1,"column":8},"identifierName":"U"},
+                "name": "U"
+              },
               "constraint": {
                 "type": "TSObjectKeyword",
                 "start":17,"end":23,"loc":{"start":{"line":1,"column":17},"end":{"line":1,"column":23}}
@@ -93,7 +97,8 @@
         "isAssign": false,
         "prefix": false,
         "postfix": false,
-        "binop": null
+        "binop": null,
+        "updateContext": null
       },
       "value": "type",
       "start":0,"end":4,"loc":{"start":{"line":1,"column":0},"end":{"line":1,"column":4}}
@@ -108,7 +113,8 @@
         "isAssign": false,
         "prefix": false,
         "postfix": false,
-        "binop": null
+        "binop": null,
+        "updateContext": null
       },
       "value": "T",
       "start":5,"end":6,"loc":{"start":{"line":1,"column":5},"end":{"line":1,"column":6}}
@@ -139,7 +145,8 @@
         "isAssign": false,
         "prefix": false,
         "postfix": false,
-        "binop": null
+        "binop": null,
+        "updateContext": null
       },
       "value": "U",
       "start":7,"end":8,"loc":{"start":{"line":1,"column":7},"end":{"line":1,"column":8}}
@@ -171,7 +178,8 @@
         "isAssign": false,
         "prefix": false,
         "postfix": false,
-        "binop": null
+        "binop": null,
+        "updateContext": null
       },
       "value": "object",
       "start":17,"end":23,"loc":{"start":{"line":1,"column":17},"end":{"line":1,"column":23}}
@@ -216,7 +224,8 @@
         "isAssign": false,
         "prefix": false,
         "postfix": false,
-        "binop": null
+        "binop": null,
+        "updateContext": null
       },
       "value": "x",
       "start":28,"end":29,"loc":{"start":{"line":1,"column":28},"end":{"line":1,"column":29}}
@@ -246,7 +255,8 @@
         "isAssign": false,
         "prefix": false,
         "postfix": false,
-        "binop": null
+        "binop": null,
+        "updateContext": null
       },
       "value": "number",
       "start":31,"end":37,"loc":{"start":{"line":1,"column":31},"end":{"line":1,"column":37}}
@@ -254,7 +264,7 @@
     {
       "type": {
         "label": "}",
-        "beforeExpr": false,
+        "beforeExpr": true,
         "startsExpr": false,
         "rightAssociative": false,
         "isLoop": false,
@@ -307,7 +317,8 @@
         "isAssign": false,
         "prefix": false,
         "postfix": false,
-        "binop": null
+        "binop": null,
+        "updateContext": null
       },
       "value": "Array",
       "start":43,"end":48,"loc":{"start":{"line":1,"column":43},"end":{"line":1,"column":48}}
@@ -338,7 +349,8 @@
         "isAssign": false,
         "prefix": false,
         "postfix": false,
-        "binop": null
+        "binop": null,
+        "updateContext": null
       },
       "value": "U",
       "start":49,"end":50,"loc":{"start":{"line":1,"column":49},"end":{"line":1,"column":50}}

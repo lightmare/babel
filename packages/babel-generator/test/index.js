@@ -342,11 +342,31 @@ describe("generation", function () {
 
   it("wraps around infer inside an array type", () => {
     const type = t.tsArrayType(
-      t.tsInferType(t.tsTypeParameter(null, null, "T")),
+      t.tsInferType(
+        t.tsTypeParameter(
+          null,
+          null,
+          !process.env.BABEL_8_BREAKING ? "T" : t.identifier("T"),
+        ),
+      ),
     );
 
     const output = generate(type).code;
     expect(output).toBe("(infer T)[]");
+  });
+
+  it("should not deduplicate comments with same start index", () => {
+    const code1 = "/*#__PURE__*/ a();";
+    const code2 = "/*#__PURE__*/ b();";
+
+    const ast1 = parse(code1).program;
+    const ast2 = parse(code2).program;
+
+    const ast = t.program([...ast1.body, ...ast2.body]);
+
+    expect(generate(ast).code).toBe(
+      "/*#__PURE__*/\na();\n\n/*#__PURE__*/\nb();",
+    );
   });
 });
 
@@ -726,15 +746,19 @@ describe("programmatic generation", function () {
       expect(output).toBe(`"\\u8868\\u683C_\\u526F\\u672C"`);
     });
 
-    it("default", () => {
-      const output = generate(string).code;
+    if (process.env.BABEL_8_BREAKING) {
+      it("default", () => {
+        const output = generate(string).code;
 
-      if (process.env.BABEL_8_BREAKING) {
         expect(output).toBe(`"表格_副本"`);
-      } else {
+      });
+    } else {
+      it("default in Babel 7", () => {
+        const output = generate(string).code;
+
         expect(output).toBe(`"\\u8868\\u683C_\\u526F\\u672C"`);
-      }
-    });
+      });
+    }
   });
 
   describe("typescript interface declaration", () => {
@@ -747,6 +771,18 @@ describe("programmatic generation", function () {
       );
       const output = generate(tsInterfaceDeclaration).code;
       expect(output).toBe("interface A {}");
+    });
+  });
+
+  describe("identifier let", () => {
+    it("detects open bracket from non-optional OptionalMemberExpression", () => {
+      const ast = parse(`for (let?.[x];;);`, {
+        sourceType: "script",
+        strictMode: "false",
+      });
+      ast.program.body[0].init.optional = false;
+      const output = generate(ast).code;
+      expect(output).toBe("for ((let)[x];;);");
     });
   });
 });
@@ -819,7 +855,13 @@ suites.forEach(function (testSuite) {
                 console.log(`New test file created: ${expected.loc}`);
                 fs.writeFileSync(expected.loc, result.code);
               } else {
-                expect(result.code).toBe(expected.code);
+                try {
+                  expect(result.code).toBe(expected.code);
+                } catch (e) {
+                  if (!process.env.OVERWRITE) throw e;
+                  console.log(`Updated test file: ${expected.loc}`);
+                  fs.writeFileSync(expected.loc, result.code);
+                }
               }
             }
           }

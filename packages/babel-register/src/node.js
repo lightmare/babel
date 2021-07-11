@@ -1,4 +1,4 @@
-import deepClone from "lodash/cloneDeep";
+import cloneDeep from "clone-deep";
 import sourceMapSupport from "source-map-support";
 import * as registerCache from "./cache";
 import * as babel from "@babel/core";
@@ -7,7 +7,6 @@ import { addHook } from "pirates";
 import fs from "fs";
 import path from "path";
 import Module from "module";
-import escapeRegExp from "./escape-regexp.cjs";
 
 const maps = {};
 let transformOpts = {};
@@ -43,7 +42,7 @@ function compile(code, filename) {
     // sourceRoot can be overwritten
     {
       sourceRoot: path.dirname(filename) + path.sep,
-      ...deepClone(transformOpts),
+      ...cloneDeep(transformOpts),
       filename,
     },
   );
@@ -107,6 +106,10 @@ function hookExtensions(exts) {
 
 export function revert() {
   if (piratesRevert) piratesRevert();
+}
+
+function escapeRegExp(string) {
+  return string.replace(/[|\\{}()[\]^$+*?.]/g, "\\$&");
 }
 
 export default function register(opts?: Object = {}) {

@@ -1,4 +1,4 @@
-var _privateMethod = new WeakSet();
+var _privateMethod = /*#__PURE__*/new WeakSet();
 
 class X {
   constructor() {
@@ -7,6 +7,6 @@ class X {
 
 }
 
-var _privateMethod2 = function _privateMethod2() {
+function _privateMethod2() {
   return 42;
-};
+}

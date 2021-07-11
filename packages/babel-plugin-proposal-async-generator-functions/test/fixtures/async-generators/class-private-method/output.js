@@ -1,4 +1,4 @@
-var _g = new WeakSet();
+var _g = /*#__PURE__*/new WeakSet();
 
 class C {
   constructor() {
@@ -7,7 +7,7 @@ class C {
 
 }
 
-var _g2 = function _g2() {
+function _g2() {
   var _this = this;
 
   return babelHelpers.wrapAsyncGenerator(function* () {
@@ -16,4 +16,4 @@ var _g2 = function _g2() {
     yield 2;
     return 3;
   })();
-};
+}

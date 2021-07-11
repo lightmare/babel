@@ -1,4 +1,4 @@
-var _privateStaticMethod = babelHelpers.classPrivateFieldLooseKey("privateStaticMethod");
+var _privateStaticMethod = /*#__PURE__*/babelHelpers.classPrivateFieldLooseKey("privateStaticMethod");
 
 class Cl {
   test() {
@@ -7,9 +7,9 @@ class Cl {
 
 }
 
-var _privateStaticMethod2 = async function _privateStaticMethod2() {
+async function _privateStaticMethod2() {
   return 2;
-};
+}
 
 Object.defineProperty(Cl, _privateStaticMethod, {
   value: _privateStaticMethod2

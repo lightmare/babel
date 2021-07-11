@@ -133,9 +133,7 @@ export function forStatement(
 }
 export function functionDeclaration(
   id: t.Identifier | null | undefined,
-  params: Array<
-    t.Identifier | t.Pattern | t.RestElement | t.TSParameterProperty
-  >,
+  params: Array<t.Identifier | t.Pattern | t.RestElement>,
   body: t.BlockStatement,
   generator?: boolean,
   async?: boolean,
@@ -144,9 +142,7 @@ export function functionDeclaration(
 }
 export function functionExpression(
   id: t.Identifier | null | undefined,
-  params: Array<
-    t.Identifier | t.Pattern | t.RestElement | t.TSParameterProperty
-  >,
+  params: Array<t.Identifier | t.Pattern | t.RestElement>,
   body: t.BlockStatement,
   generator?: boolean,
   async?: boolean,
@@ -226,9 +222,7 @@ export function objectExpression(
 export function objectMethod(
   kind: "method" | "get" | "set" | undefined,
   key: t.Expression | t.Identifier | t.StringLiteral | t.NumericLiteral,
-  params: Array<
-    t.Identifier | t.Pattern | t.RestElement | t.TSParameterProperty
-  >,
+  params: Array<t.Identifier | t.Pattern | t.RestElement>,
   body: t.BlockStatement,
   computed?: boolean,
   generator?: boolean,
@@ -338,9 +332,7 @@ export function arrayPattern(
   return builder("ArrayPattern", ...arguments);
 }
 export function arrowFunctionExpression(
-  params: Array<
-    t.Identifier | t.Pattern | t.RestElement | t.TSParameterProperty
-  >,
+  params: Array<t.Identifier | t.Pattern | t.RestElement>,
   body: t.BlockStatement | t.Expression,
   async?: boolean,
 ): t.ArrowFunctionExpression {
@@ -522,6 +514,38 @@ export function optionalCallExpression(
   optional: boolean,
 ): t.OptionalCallExpression {
   return builder("OptionalCallExpression", ...arguments);
+}
+export function classProperty(
+  key: t.Identifier | t.StringLiteral | t.NumericLiteral | t.Expression,
+  value?: t.Expression | null,
+  typeAnnotation?: t.TypeAnnotation | t.TSTypeAnnotation | t.Noop | null,
+  decorators?: Array<t.Decorator> | null,
+  computed?: boolean,
+  _static?: boolean,
+): t.ClassProperty {
+  return builder("ClassProperty", ...arguments);
+}
+export function classPrivateProperty(
+  key: t.PrivateName,
+  value: t.Expression | null | undefined,
+  decorators: Array<t.Decorator> | null | undefined,
+  _static: any,
+): t.ClassPrivateProperty {
+  return builder("ClassPrivateProperty", ...arguments);
+}
+export function classPrivateMethod(
+  kind: "get" | "set" | "method" | "constructor" | undefined,
+  key: t.PrivateName,
+  params: Array<
+    t.Identifier | t.Pattern | t.RestElement | t.TSParameterProperty
+  >,
+  body: t.BlockStatement,
+  _static?: boolean,
+): t.ClassPrivateMethod {
+  return builder("ClassPrivateMethod", ...arguments);
+}
+export function privateName(id: t.Identifier): t.PrivateName {
+  return builder("PrivateName", ...arguments);
 }
 export function anyTypeAnnotation(): t.AnyTypeAnnotation {
   return builder("AnyTypeAnnotation", ...arguments);
@@ -854,6 +878,18 @@ export function enumStringMember(
 export function enumDefaultedMember(id: t.Identifier): t.EnumDefaultedMember {
   return builder("EnumDefaultedMember", ...arguments);
 }
+export function indexedAccessType(
+  objectType: t.FlowType,
+  indexType: t.FlowType,
+): t.IndexedAccessType {
+  return builder("IndexedAccessType", ...arguments);
+}
+export function optionalIndexedAccessType(
+  objectType: t.FlowType,
+  indexType: t.FlowType,
+): t.OptionalIndexedAccessType {
+  return builder("OptionalIndexedAccessType", ...arguments);
+}
 export function jsxAttribute(
   name: t.JSXIdentifier | t.JSXNamespacedName,
   value?:
@@ -988,16 +1024,6 @@ export function bindExpression(
 ): t.BindExpression {
   return builder("BindExpression", ...arguments);
 }
-export function classProperty(
-  key: t.Identifier | t.StringLiteral | t.NumericLiteral | t.Expression,
-  value?: t.Expression | null,
-  typeAnnotation?: t.TypeAnnotation | t.TSTypeAnnotation | t.Noop | null,
-  decorators?: Array<t.Decorator> | null,
-  computed?: boolean,
-  _static?: boolean,
-): t.ClassProperty {
-  return builder("ClassProperty", ...arguments);
-}
 export function pipelineTopicExpression(
   expression: t.Expression,
 ): t.PipelineTopicExpression {
@@ -1011,25 +1037,6 @@ export function pipelineBareFunction(
 export function pipelinePrimaryTopicReference(): t.PipelinePrimaryTopicReference {
   return builder("PipelinePrimaryTopicReference", ...arguments);
 }
-export function classPrivateProperty(
-  key: t.PrivateName,
-  value: t.Expression | null | undefined,
-  decorators: Array<t.Decorator> | null | undefined,
-  _static: any,
-): t.ClassPrivateProperty {
-  return builder("ClassPrivateProperty", ...arguments);
-}
-export function classPrivateMethod(
-  kind: "get" | "set" | "method" | "constructor" | undefined,
-  key: t.PrivateName,
-  params: Array<
-    t.Identifier | t.Pattern | t.RestElement | t.TSParameterProperty
-  >,
-  body: t.BlockStatement,
-  _static?: boolean,
-): t.ClassPrivateMethod {
-  return builder("ClassPrivateMethod", ...arguments);
-}
 export function importAttribute(
   key: t.Identifier | t.StringLiteral,
   value: t.StringLiteral,
@@ -1039,16 +1046,16 @@ export function importAttribute(
 export function decorator(expression: t.Expression): t.Decorator {
   return builder("Decorator", ...arguments);
 }
-export function doExpression(body: t.BlockStatement): t.DoExpression {
+export function doExpression(
+  body: t.BlockStatement,
+  async?: boolean,
+): t.DoExpression {
   return builder("DoExpression", ...arguments);
 }
 export function exportDefaultSpecifier(
   exported: t.Identifier,
 ): t.ExportDefaultSpecifier {
   return builder("ExportDefaultSpecifier", ...arguments);
-}
-export function privateName(id: t.Identifier): t.PrivateName {
-  return builder("PrivateName", ...arguments);
 }
 export function recordExpression(
   properties: Array<t.ObjectProperty | t.SpreadElement>,
@@ -1083,9 +1090,7 @@ export { tsParameterProperty as tSParameterProperty };
 export function tsDeclareFunction(
   id: t.Identifier | null | undefined,
   typeParameters: t.TSTypeParameterDeclaration | t.Noop | null | undefined,
-  params: Array<
-    t.Identifier | t.Pattern | t.RestElement | t.TSParameterProperty
-  >,
+  params: Array<t.Identifier | t.Pattern | t.RestElement>,
   returnType?: t.TSTypeAnnotation | t.Noop | null,
 ): t.TSDeclareFunction {
   return builder("TSDeclareFunction", ...arguments);
@@ -1328,7 +1333,8 @@ export function tsLiteralType(
     | t.NumericLiteral
     | t.StringLiteral
     | t.BooleanLiteral
-    | t.BigIntLiteral,
+    | t.BigIntLiteral
+    | t.UnaryExpression,
 ): t.TSLiteralType {
   return builder("TSLiteralType", ...arguments);
 }

@@ -91,13 +91,13 @@ describe("browserslist", () => {
     ).toEqual({ chrome: "80.0.0" });
   });
 
-  it("loads .browserslistrc relative to the input file", () => {
+  it("loads .browserslistrc relative to the root", () => {
     expect(
       loadOptions({
         cwd: join(cwd, "fixtures", "targets"),
-        filename: "./nested/test.js",
+        filename: "./node_modules/dep/test.js",
       }).targets,
-    ).toEqual({ edge: "14.0.0" });
+    ).toEqual({ chrome: "80.0.0" });
   });
 
   describe("browserslistConfigFile", () => {
@@ -119,15 +119,25 @@ describe("browserslist", () => {
       ).toEqual({ firefox: "74.0.0" });
     });
 
-    it("is relative to the project root", () => {
+    it("is relative to the cwd even if specifying 'root'", () => {
       expect(
         loadOptions({
           cwd: join(cwd, "fixtures", "targets"),
           root: "..",
           filename: "./nested/test.js",
-          browserslistConfigFile: "./targets/.browserslistrc-firefox",
+          browserslistConfigFile: "./.browserslistrc-firefox",
         }).targets,
       ).toEqual({ firefox: "74.0.0" });
+    });
+
+    it("is relative to the config files that defines it", () => {
+      expect(
+        loadOptions({
+          cwd: join(cwd, "fixtures", "targets"),
+          filename: "./node_modules/dep/test.js",
+          babelrcRoots: ["./node_modules/dep/"],
+        }).targets,
+      ).toEqual({ edge: "14.0.0" });
     });
   });
 

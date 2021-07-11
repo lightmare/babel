@@ -4,23 +4,30 @@
 
 import type { Options } from "../options";
 import * as N from "../types";
-import type { Position } from "../util/location";
 import * as charCodes from "charcodes";
 import { isIdentifierStart, isIdentifierChar } from "../util/identifier";
 import { types as tt, keywords as keywordTypes, type TokenType } from "./types";
 import { type TokContext, types as ct } from "./context";
-import ParserErrors, { Errors } from "../parser/error";
+import ParserErrors, { Errors, type ErrorTemplate } from "../parser/error";
 import { SourceLocation } from "../util/location";
 import {
-  lineBreak,
   lineBreakG,
   isNewLine,
   isWhitespace,
   skipWhiteSpace,
 } from "../util/whitespace";
 import State from "./state";
+import type { LookaheadState } from "./state";
 
-const VALID_REGEX_FLAGS = new Set(["g", "m", "s", "i", "y", "u"]);
+const VALID_REGEX_FLAGS = new Set([
+  charCodes.lowercaseG,
+  charCodes.lowercaseM,
+  charCodes.lowercaseS,
+  charCodes.lowercaseI,
+  charCodes.lowercaseY,
+  charCodes.lowercaseU,
+  charCodes.lowercaseD,
+]);
 
 // The following character codes are forbidden from being
 // an immediate sibling of NumericLiteralSeparator _
@@ -115,7 +122,7 @@ export default class Tokenizer extends ParserErrors {
   // parser/util.js
   /*::
   +hasPrecedingLineBreak: () => boolean;
-  +unexpected: (pos?: ?number, messageOrType?: string | TokenType) => empty;
+  +unexpected: (pos?: ?number, messageOrType?: ErrorTemplate | TokenType) => empty;
   +expectPlugin: (name: string, pos?: ?number) => true;
   */
 
@@ -144,11 +151,9 @@ export default class Tokenizer extends ParserErrors {
   // Move to the next token
 
   next(): void {
-    if (!this.isLookahead) {
-      this.checkKeywordEscapes();
-      if (this.options.tokens) {
-        this.pushToken(new Token(this.state));
-      }
+    this.checkKeywordEscapes();
+    if (this.options.tokens) {
+      this.pushToken(new Token(this.state));
     }
 
     this.state.lastTokEnd = this.state.end;
@@ -175,14 +180,50 @@ export default class Tokenizer extends ParserErrors {
     return this.state.type === type;
   }
 
-  // TODO
+  /**
+   * Create a LookaheadState from current parser state
+   *
+   * @param {State} state
+   * @returns {LookaheadState}
+   * @memberof Tokenizer
+   */
+  createLookaheadState(state: State): LookaheadState {
+    return {
+      pos: state.pos,
+      value: null,
+      type: state.type,
+      start: state.start,
+      end: state.end,
+      lastTokEnd: state.end,
+      context: [this.curContext()],
+      inType: state.inType,
+    };
+  }
 
-  lookahead(): State {
+  /**
+   * lookahead peeks the next token, skipping changes to token context and
+   * comment stack. For performance it returns a limited LookaheadState
+   * instead of full parser state.
+   *
+   * The { column, line } Loc info is not included in lookahead since such usage
+   * is rare. Although it may return other location properties e.g. `curLine` and
+   * `lineStart`, these properties are not listed in the LookaheadState interface
+   * and thus the returned value is _NOT_ reliable.
+   *
+   * The tokenizer should make best efforts to avoid using any parser state
+   * other than those defined in LookaheadState
+   *
+   * @returns {LookaheadState}
+   * @memberof Tokenizer
+   */
+  lookahead(): LookaheadState {
     const old = this.state;
-    this.state = old.clone(true);
+    // For performance we use a simpified tokenizer state structure
+    // $FlowIgnore
+    this.state = this.createLookaheadState(old);
 
     this.isLookahead = true;
-    this.next();
+    this.nextToken();
     this.isLookahead = false;
 
     const curr = this.state;
@@ -203,6 +244,21 @@ export default class Tokenizer extends ParserErrors {
 
   lookaheadCharCode(): number {
     return this.input.charCodeAt(this.nextTokenStart());
+  }
+
+  codePointAtPos(pos: number): number {
+    // The implementation is based on
+    // https://source.chromium.org/chromium/chromium/src/+/master:v8/src/builtins/builtins-string-gen.cc;l=1455;drc=221e331b49dfefadbc6fa40b0c68e6f97606d0b3;bpv=0;bpt=1
+    // We reimplement `codePointAt` because `codePointAt` is a V8 builtin which is not inlined by TurboFan (as of M91)
+    // since `input` is mostly ASCII, an inlined `charCodeAt` wins here
+    let cp = this.input.charCodeAt(pos);
+    if ((cp & 0xfc00) === 0xd800 && ++pos < this.input.length) {
+      const trail = this.input.charCodeAt(pos);
+      if ((trail & 0xfc00) === 0xdc00) {
+        cp = 0x10000 + ((cp & 0x3ff) << 10) + (trail & 0x3ff);
+      }
+    }
+    return cp;
   }
 
   // Toggle strict mode. Re-reads the next number or string to please
@@ -232,45 +288,24 @@ export default class Tokenizer extends ParserErrors {
 
   nextToken(): void {
     const curContext = this.curContext();
-    if (!curContext?.preserveSpace) this.skipSpace();
+    if (!curContext.preserveSpace) this.skipSpace();
     this.state.start = this.state.pos;
-    this.state.startLoc = this.state.curPosition();
+    if (!this.isLookahead) this.state.startLoc = this.state.curPosition();
     if (this.state.pos >= this.length) {
       this.finishToken(tt.eof);
       return;
     }
 
-    const override = curContext?.override;
-    if (override) {
-      override(this);
+    if (curContext === ct.template) {
+      this.readTmplToken();
     } else {
-      this.getTokenFromCode(this.input.codePointAt(this.state.pos));
+      this.getTokenFromCode(this.codePointAtPos(this.state.pos));
     }
   }
 
-  pushComment(
-    block: boolean,
-    text: string,
-    start: number,
-    end: number,
-    startLoc: Position,
-    endLoc: Position,
-  ): void {
-    const comment = {
-      type: block ? "CommentBlock" : "CommentLine",
-      value: text,
-      start: start,
-      end: end,
-      loc: new SourceLocation(startLoc, endLoc),
-    };
-
-    if (this.options.tokens) this.pushToken(comment);
-    this.state.comments.push(comment);
-    this.addComment(comment);
-  }
-
-  skipBlockComment(): void {
-    const startLoc = this.state.curPosition();
+  skipBlockComment(): N.CommentBlock | void {
+    let startLoc;
+    if (!this.isLookahead) startLoc = this.state.curPosition();
     const start = this.state.pos;
     const end = this.input.indexOf("*/", this.state.pos + 2);
     if (end === -1) throw this.raise(start, Errors.UnterminatedComment);
@@ -289,20 +324,24 @@ export default class Tokenizer extends ParserErrors {
     // If we are doing a lookahead right now we need to advance the position (above code)
     // but we do not want to push the comment to the state.
     if (this.isLookahead) return;
+    /*:: invariant(startLoc) */
 
-    this.pushComment(
-      true,
-      this.input.slice(start + 2, end),
-      start,
-      this.state.pos,
-      startLoc,
-      this.state.curPosition(),
-    );
+    const value = this.input.slice(start + 2, end);
+    const comment = {
+      type: "CommentBlock",
+      value: value,
+      start: start,
+      end: end + 2,
+      loc: new SourceLocation(startLoc, this.state.curPosition()),
+    };
+    if (this.options.tokens) this.pushToken(comment);
+    return comment;
   }
 
-  skipLineComment(startSkip: number): void {
+  skipLineComment(startSkip: number): N.CommentLine | void {
     const start = this.state.pos;
-    const startLoc = this.state.curPosition();
+    let startLoc;
+    if (!this.isLookahead) startLoc = this.state.curPosition();
     let ch = this.input.charCodeAt((this.state.pos += startSkip));
     if (this.state.pos < this.length) {
       while (!isNewLine(ch) && ++this.state.pos < this.length) {
@@ -313,21 +352,28 @@ export default class Tokenizer extends ParserErrors {
     // If we are doing a lookahead right now we need to advance the position (above code)
     // but we do not want to push the comment to the state.
     if (this.isLookahead) return;
+    /*:: invariant(startLoc) */
 
-    this.pushComment(
-      false,
-      this.input.slice(start + startSkip, this.state.pos),
+    const end = this.state.pos;
+    const value = this.input.slice(start + startSkip, end);
+
+    const comment = {
+      type: "CommentLine",
+      value,
       start,
-      this.state.pos,
-      startLoc,
-      this.state.curPosition(),
-    );
+      end,
+      loc: new SourceLocation(startLoc, this.state.curPosition()),
+    };
+    if (this.options.tokens) this.pushToken(comment);
+    return comment;
   }
 
   // Called at the start of the parse and after every token. Skips
   // whitespace and comments, and.
 
   skipSpace(): void {
+    const spaceStart = this.state.pos;
+    const comments = [];
     loop: while (this.state.pos < this.length) {
       const ch = this.input.charCodeAt(this.state.pos);
       switch (ch) {
@@ -353,13 +399,23 @@ export default class Tokenizer extends ParserErrors {
 
         case charCodes.slash:
           switch (this.input.charCodeAt(this.state.pos + 1)) {
-            case charCodes.asterisk:
-              this.skipBlockComment();
+            case charCodes.asterisk: {
+              const comment = this.skipBlockComment();
+              if (comment !== undefined) {
+                this.addComment(comment);
+                comments.push(comment);
+              }
               break;
+            }
 
-            case charCodes.slash:
-              this.skipLineComment(2);
+            case charCodes.slash: {
+              const comment = this.skipLineComment(2);
+              if (comment !== undefined) {
+                this.addComment(comment);
+                comments.push(comment);
+              }
               break;
+            }
 
             default:
               break loop;
@@ -369,10 +425,55 @@ export default class Tokenizer extends ParserErrors {
         default:
           if (isWhitespace(ch)) {
             ++this.state.pos;
+          } else if (ch === charCodes.dash && !this.inModule) {
+            const pos = this.state.pos;
+            if (
+              this.input.charCodeAt(pos + 1) === charCodes.dash &&
+              this.input.charCodeAt(pos + 2) === charCodes.greaterThan &&
+              (spaceStart === 0 || this.state.lineStart > spaceStart)
+            ) {
+              // A `-->` line comment
+              const comment = this.skipLineComment(3);
+              if (comment !== undefined) {
+                this.addComment(comment);
+                comments.push(comment);
+              }
+            } else {
+              break loop;
+            }
+          } else if (ch === charCodes.lessThan && !this.inModule) {
+            const pos = this.state.pos;
+            if (
+              this.input.charCodeAt(pos + 1) === charCodes.exclamationMark &&
+              this.input.charCodeAt(pos + 2) === charCodes.dash &&
+              this.input.charCodeAt(pos + 3) === charCodes.dash
+            ) {
+              // `<!--`, an XML-style comment that should be interpreted as a line comment
+              const comment = this.skipLineComment(4);
+              if (comment !== undefined) {
+                this.addComment(comment);
+                comments.push(comment);
+              }
+            } else {
+              break loop;
+            }
           } else {
             break loop;
           }
       }
+    }
+
+    if (comments.length > 0) {
+      const end = this.state.pos;
+      const CommentWhitespace = {
+        start: spaceStart,
+        end,
+        comments,
+        leadingNode: null,
+        trailingNode: null,
+        containingNode: null,
+      };
+      this.state.commentStack.push(CommentWhitespace);
     }
   }
 
@@ -383,12 +484,14 @@ export default class Tokenizer extends ParserErrors {
 
   finishToken(type: TokenType, val: any): void {
     this.state.end = this.state.pos;
-    this.state.endLoc = this.state.curPosition();
     const prevType = this.state.type;
     this.state.type = type;
     this.state.value = val;
 
-    if (!this.isLookahead) this.updateContext(prevType);
+    if (!this.isLookahead) {
+      this.state.endLoc = this.state.curPosition();
+      this.updateContext(prevType);
+    }
   }
 
   // ### Token reading
@@ -407,7 +510,7 @@ export default class Tokenizer extends ParserErrors {
     }
 
     const nextPos = this.state.pos + 1;
-    const next = this.input.charCodeAt(nextPos);
+    const next = this.codePointAtPos(nextPos);
     if (next >= charCodes.digit0 && next <= charCodes.digit9) {
       throw this.raise(this.state.pos, Errors.UnexpectedDigitAfterHash);
     }
@@ -430,6 +533,7 @@ export default class Tokenizer extends ParserErrors {
         );
       }
 
+      this.state.pos += 2;
       if (next === charCodes.leftCurlyBrace) {
         // #{
         this.finishToken(tt.braceHashL);
@@ -437,7 +541,12 @@ export default class Tokenizer extends ParserErrors {
         // #[
         this.finishToken(tt.bracketHashL);
       }
-      this.state.pos += 2;
+    } else if (isIdentifierStart(next)) {
+      ++this.state.pos;
+      this.finishToken(tt.privateName, this.readWord1(next));
+    } else if (next === charCodes.backslash) {
+      ++this.state.pos;
+      this.finishToken(tt.privateName, this.readWord1());
     } else {
       this.finishOp(tt.hash, 1);
     }
@@ -463,16 +572,9 @@ export default class Tokenizer extends ParserErrors {
   }
 
   readToken_slash(): void {
-    // '/'
-    if (this.state.exprAllowed && !this.state.inType) {
-      ++this.state.pos;
-      this.readRegexp();
-      return;
-    }
-
     const next = this.input.charCodeAt(this.state.pos + 1);
     if (next === charCodes.equalsTo) {
-      this.finishOp(tt.assign, 2);
+      this.finishOp(tt.slashAssign, 2);
     } else {
       this.finishOp(tt.slash, 1);
     }
@@ -517,7 +619,6 @@ export default class Tokenizer extends ParserErrors {
     let type = code === charCodes.asterisk ? tt.star : tt.modulo;
     let width = 1;
     let next = this.input.charCodeAt(this.state.pos + 1);
-    const exprAllowed = this.state.exprAllowed;
 
     // Exponentiation operator **
     if (code === charCodes.asterisk && next === charCodes.asterisk) {
@@ -526,7 +627,7 @@ export default class Tokenizer extends ParserErrors {
       type = tt.exponent;
     }
 
-    if (next === charCodes.equalsTo && !exprAllowed) {
+    if (next === charCodes.equalsTo && !this.state.inType) {
       width++;
       type = tt.assign;
     }
@@ -567,8 +668,8 @@ export default class Tokenizer extends ParserErrors {
             Errors.RecordExpressionBarIncorrectEndSyntaxType,
           );
         }
-
-        this.finishOp(tt.braceBarR, 2);
+        this.state.pos += 2;
+        this.finishToken(tt.braceBarR);
         return;
       }
 
@@ -583,8 +684,8 @@ export default class Tokenizer extends ParserErrors {
             Errors.TupleExpressionBarIncorrectEndSyntaxType,
           );
         }
-
-        this.finishOp(tt.bracketBarR, 2);
+        this.state.pos += 2;
+        this.finishToken(tt.bracketBarR);
         return;
       }
     }
@@ -615,18 +716,6 @@ export default class Tokenizer extends ParserErrors {
     const next = this.input.charCodeAt(this.state.pos + 1);
 
     if (next === code) {
-      if (
-        next === charCodes.dash &&
-        !this.inModule &&
-        this.input.charCodeAt(this.state.pos + 2) === charCodes.greaterThan &&
-        (this.state.lastTokEnd === 0 || this.hasPrecedingLineBreak())
-      ) {
-        // A `-->` line comment
-        this.skipLineComment(3);
-        this.skipSpace();
-        this.nextToken();
-        return;
-      }
       this.finishOp(tt.incDec, 2);
       return;
     }
@@ -654,20 +743,6 @@ export default class Tokenizer extends ParserErrors {
         return;
       }
       this.finishOp(tt.bitShift, size);
-      return;
-    }
-
-    if (
-      next === charCodes.exclamationMark &&
-      code === charCodes.lessThan &&
-      !this.inModule &&
-      this.input.charCodeAt(this.state.pos + 2) === charCodes.dash &&
-      this.input.charCodeAt(this.state.pos + 3) === charCodes.dash
-    ) {
-      // `<!--`, an XML-style comment that should be interpreted as a line comment
-      this.skipLineComment(4);
-      this.skipSpace();
-      this.nextToken();
       return;
     }
 
@@ -764,8 +839,8 @@ export default class Tokenizer extends ParserErrors {
           }
 
           // [|
-          this.finishToken(tt.bracketBarL);
           this.state.pos += 2;
+          this.finishToken(tt.bracketBarL);
         } else {
           ++this.state.pos;
           this.finishToken(tt.bracketL);
@@ -788,8 +863,8 @@ export default class Tokenizer extends ParserErrors {
           }
 
           // {|
-          this.finishToken(tt.braceBarL);
           this.state.pos += 2;
+          this.finishToken(tt.braceBarL);
         } else {
           ++this.state.pos;
           this.finishToken(tt.braceL);
@@ -919,7 +994,7 @@ export default class Tokenizer extends ParserErrors {
 
       default:
         if (isIdentifierStart(code)) {
-          this.readWord();
+          this.readWord(code);
           return;
         }
     }
@@ -938,55 +1013,54 @@ export default class Tokenizer extends ParserErrors {
   }
 
   readRegexp(): void {
-    const start = this.state.pos;
+    const start = this.state.start + 1;
     let escaped, inClass;
-    for (;;) {
-      if (this.state.pos >= this.length) {
+    let { pos } = this.state;
+    for (; ; ++pos) {
+      if (pos >= this.length) {
         throw this.raise(start, Errors.UnterminatedRegExp);
       }
-      const ch = this.input.charAt(this.state.pos);
-      if (lineBreak.test(ch)) {
+      const ch = this.input.charCodeAt(pos);
+      if (isNewLine(ch)) {
         throw this.raise(start, Errors.UnterminatedRegExp);
       }
       if (escaped) {
         escaped = false;
       } else {
-        if (ch === "[") {
+        if (ch === charCodes.leftSquareBracket) {
           inClass = true;
-        } else if (ch === "]" && inClass) {
+        } else if (ch === charCodes.rightSquareBracket && inClass) {
           inClass = false;
-        } else if (ch === "/" && !inClass) {
+        } else if (ch === charCodes.slash && !inClass) {
           break;
         }
-        escaped = ch === "\\";
+        escaped = ch === charCodes.backslash;
       }
-      ++this.state.pos;
     }
-    const content = this.input.slice(start, this.state.pos);
-    ++this.state.pos;
+    const content = this.input.slice(start, pos);
+    ++pos;
 
     let mods = "";
 
-    while (this.state.pos < this.length) {
-      const char = this.input[this.state.pos];
-      const charCode = this.input.codePointAt(this.state.pos);
+    while (pos < this.length) {
+      const cp = this.codePointAtPos(pos);
+      // It doesn't matter if cp > 0xffff, the loop will either throw or break because we check on cp
+      const char = String.fromCharCode(cp);
 
-      if (VALID_REGEX_FLAGS.has(char)) {
-        if (mods.indexOf(char) > -1) {
-          this.raise(this.state.pos + 1, Errors.DuplicateRegExpFlags);
+      if (VALID_REGEX_FLAGS.has(cp)) {
+        if (mods.includes(char)) {
+          this.raise(pos + 1, Errors.DuplicateRegExpFlags);
         }
-      } else if (
-        isIdentifierChar(charCode) ||
-        charCode === charCodes.backslash
-      ) {
-        this.raise(this.state.pos + 1, Errors.MalformedRegExpFlags);
+      } else if (isIdentifierChar(cp) || cp === charCodes.backslash) {
+        this.raise(pos + 1, Errors.MalformedRegExpFlags);
       } else {
         break;
       }
 
-      ++this.state.pos;
+      ++pos;
       mods += char;
     }
+    this.state.pos = pos;
 
     this.finishToken(tt.regexp, {
       pattern: content,
@@ -1107,7 +1181,7 @@ export default class Tokenizer extends ParserErrors {
       throw this.raise(start, Errors.InvalidDecimal);
     }
 
-    if (isIdentifierStart(this.input.codePointAt(this.state.pos))) {
+    if (isIdentifierStart(this.codePointAtPos(this.state.pos))) {
       throw this.raise(this.state.pos, Errors.NumberIdentifier);
     }
 
@@ -1193,7 +1267,7 @@ export default class Tokenizer extends ParserErrors {
       isDecimal = true;
     }
 
-    if (isIdentifierStart(this.input.codePointAt(this.state.pos))) {
+    if (isIdentifierStart(this.codePointAtPos(this.state.pos))) {
       throw this.raise(this.state.pos, Errors.NumberIdentifier);
     }
 
@@ -1338,7 +1412,7 @@ export default class Tokenizer extends ParserErrors {
     }
   }
 
-  recordStrictModeErrors(pos: number, message: string) {
+  recordStrictModeErrors(pos: number, message: ErrorTemplate) {
     if (this.state.strict && !this.state.strictErrors.has(pos)) {
       this.raise(pos, message);
     } else {
@@ -1456,19 +1530,23 @@ export default class Tokenizer extends ParserErrors {
   //
   // Incrementally adds only escaped chars, adding other chunks as-is
   // as a micro-optimization.
+  //
+  // When `firstCode` is given, it assumes it is always an identifier start and
+  // will skip reading start position again
 
-  readWord1(): string {
-    let word = "";
+  readWord1(firstCode: number | void): string {
     this.state.containsEsc = false;
+    let word = "";
     const start = this.state.pos;
     let chunkStart = this.state.pos;
+    if (firstCode !== undefined) {
+      this.state.pos += firstCode <= 0xffff ? 1 : 2;
+    }
 
     while (this.state.pos < this.length) {
-      const ch = this.input.codePointAt(this.state.pos);
+      const ch = this.codePointAtPos(this.state.pos);
       if (isIdentifierChar(ch)) {
         this.state.pos += ch <= 0xffff ? 1 : 2;
-      } else if (this.state.isIterator && ch === charCodes.atSign) {
-        ++this.state.pos;
       } else if (ch === charCodes.backslash) {
         this.state.containsEsc = true;
 
@@ -1479,6 +1557,7 @@ export default class Tokenizer extends ParserErrors {
 
         if (this.input.charCodeAt(++this.state.pos) !== charCodes.lowercaseU) {
           this.raise(this.state.pos, Errors.MissingUnicodeEscape);
+          chunkStart = this.state.pos - 1;
           continue;
         }
 
@@ -1499,25 +1578,12 @@ export default class Tokenizer extends ParserErrors {
     return word + this.input.slice(chunkStart, this.state.pos);
   }
 
-  isIterator(word: string): boolean {
-    return word === "@@iterator" || word === "@@asyncIterator";
-  }
-
   // Read an identifier or keyword token. Will check for reserved
   // words when necessary.
 
-  readWord(): void {
-    const word = this.readWord1();
+  readWord(firstCode: number | void): void {
+    const word = this.readWord1(firstCode);
     const type = keywordTypes.get(word) || tt.name;
-
-    // Allow @@iterator and @@asyncIterator as a identifier only inside type
-    if (
-      this.state.isIterator &&
-      (!this.isIterator(word) || !this.state.inType)
-    ) {
-      this.raise(this.state.pos, Errors.InvalidIdentifier, word);
-    }
-
     this.finishToken(type, word);
   }
 
@@ -1528,68 +1594,9 @@ export default class Tokenizer extends ParserErrors {
     }
   }
 
-  braceIsBlock(prevType: TokenType): boolean {
-    const parent = this.curContext();
-    if (parent === ct.functionExpression || parent === ct.functionStatement) {
-      return true;
-    }
-    if (
-      prevType === tt.colon &&
-      (parent === ct.braceStatement || parent === ct.braceExpression)
-    ) {
-      return !parent.isExpr;
-    }
-
-    // The check for `tt.name && exprAllowed` detects whether we are
-    // after a `yield` or `of` construct. See the `updateContext` for
-    // `tt.name`.
-    if (
-      prevType === tt._return ||
-      (prevType === tt.name && this.state.exprAllowed)
-    ) {
-      return this.hasPrecedingLineBreak();
-    }
-
-    if (
-      prevType === tt._else ||
-      prevType === tt.semi ||
-      prevType === tt.eof ||
-      prevType === tt.parenR ||
-      prevType === tt.arrow
-    ) {
-      return true;
-    }
-
-    if (prevType === tt.braceL) {
-      return parent === ct.braceStatement;
-    }
-
-    if (
-      prevType === tt._var ||
-      prevType === tt._const ||
-      prevType === tt.name
-    ) {
-      return false;
-    }
-
-    if (prevType === tt.relational) {
-      // `class C<T> { ... }`
-      return true;
-    }
-
-    return !this.state.exprAllowed;
-  }
-
+  // the prevType is required by the jsx plugin
+  // eslint-disable-next-line no-unused-vars
   updateContext(prevType: TokenType): void {
-    const type = this.state.type;
-    let update;
-
-    if (type.keyword && (prevType === tt.dot || prevType === tt.questionDot)) {
-      this.state.exprAllowed = false;
-    } else if ((update = type.updateContext)) {
-      update.call(this, prevType);
-    } else {
-      this.state.exprAllowed = type.beforeExpr;
-    }
+    this.state.type.updateContext?.(this.state.context);
   }
 }

@@ -1,6 +1,6 @@
-var _PRIVATE_STATIC_FIELD = babelHelpers.classPrivateFieldLooseKey("PRIVATE_STATIC_FIELD");
+var _PRIVATE_STATIC_FIELD = /*#__PURE__*/babelHelpers.classPrivateFieldLooseKey("PRIVATE_STATIC_FIELD");
 
-var _privateStaticFieldValue = babelHelpers.classPrivateFieldLooseKey("privateStaticFieldValue");
+var _privateStaticFieldValue = /*#__PURE__*/babelHelpers.classPrivateFieldLooseKey("privateStaticFieldValue");
 
 class Cl {
   static getPrivateStaticFieldValue() {
@@ -9,9 +9,9 @@ class Cl {
 
 }
 
-var _set_privateStaticFieldValue = function (newValue) {
+function _set_privateStaticFieldValue(newValue) {
   babelHelpers.classPrivateFieldLooseBase(Cl, _PRIVATE_STATIC_FIELD)[_PRIVATE_STATIC_FIELD] = newValue;
-};
+}
 
 Object.defineProperty(Cl, _privateStaticFieldValue, {
   get: void 0,

@@ -1,4 +1,4 @@
-var _method = new WeakSet();
+var _method = /*#__PURE__*/new WeakSet();
 
 class A {
   self() {
@@ -16,4 +16,4 @@ class A {
 
 }
 
-var _method2 = function _method2() {};
+function _method2() {}

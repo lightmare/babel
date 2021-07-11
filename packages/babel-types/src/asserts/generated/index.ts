@@ -500,6 +500,30 @@ export function assertOptionalCallExpression(
 ): asserts node is t.OptionalCallExpression {
   assert("OptionalCallExpression", node, opts);
 }
+export function assertClassProperty(
+  node: object | null | undefined,
+  opts?: object | null,
+): asserts node is t.ClassProperty {
+  assert("ClassProperty", node, opts);
+}
+export function assertClassPrivateProperty(
+  node: object | null | undefined,
+  opts?: object | null,
+): asserts node is t.ClassPrivateProperty {
+  assert("ClassPrivateProperty", node, opts);
+}
+export function assertClassPrivateMethod(
+  node: object | null | undefined,
+  opts?: object | null,
+): asserts node is t.ClassPrivateMethod {
+  assert("ClassPrivateMethod", node, opts);
+}
+export function assertPrivateName(
+  node: object | null | undefined,
+  opts?: object | null,
+): asserts node is t.PrivateName {
+  assert("PrivateName", node, opts);
+}
 export function assertAnyTypeAnnotation(
   node: object | null | undefined,
   opts?: object | null,
@@ -878,6 +902,18 @@ export function assertEnumDefaultedMember(
 ): asserts node is t.EnumDefaultedMember {
   assert("EnumDefaultedMember", node, opts);
 }
+export function assertIndexedAccessType(
+  node: object | null | undefined,
+  opts?: object | null,
+): asserts node is t.IndexedAccessType {
+  assert("IndexedAccessType", node, opts);
+}
+export function assertOptionalIndexedAccessType(
+  node: object | null | undefined,
+  opts?: object | null,
+): asserts node is t.OptionalIndexedAccessType {
+  assert("OptionalIndexedAccessType", node, opts);
+}
 export function assertJSXAttribute(
   node: object | null | undefined,
   opts?: object | null,
@@ -998,12 +1034,6 @@ export function assertBindExpression(
 ): asserts node is t.BindExpression {
   assert("BindExpression", node, opts);
 }
-export function assertClassProperty(
-  node: object | null | undefined,
-  opts?: object | null,
-): asserts node is t.ClassProperty {
-  assert("ClassProperty", node, opts);
-}
 export function assertPipelineTopicExpression(
   node: object | null | undefined,
   opts?: object | null,
@@ -1021,18 +1051,6 @@ export function assertPipelinePrimaryTopicReference(
   opts?: object | null,
 ): asserts node is t.PipelinePrimaryTopicReference {
   assert("PipelinePrimaryTopicReference", node, opts);
-}
-export function assertClassPrivateProperty(
-  node: object | null | undefined,
-  opts?: object | null,
-): asserts node is t.ClassPrivateProperty {
-  assert("ClassPrivateProperty", node, opts);
-}
-export function assertClassPrivateMethod(
-  node: object | null | undefined,
-  opts?: object | null,
-): asserts node is t.ClassPrivateMethod {
-  assert("ClassPrivateMethod", node, opts);
 }
 export function assertImportAttribute(
   node: object | null | undefined,
@@ -1057,12 +1075,6 @@ export function assertExportDefaultSpecifier(
   opts?: object | null,
 ): asserts node is t.ExportDefaultSpecifier {
   assert("ExportDefaultSpecifier", node, opts);
-}
-export function assertPrivateName(
-  node: object | null | undefined,
-  opts?: object | null,
-): asserts node is t.PrivateName {
-  assert("PrivateName", node, opts);
 }
 export function assertRecordExpression(
   node: object | null | undefined,
@@ -1676,6 +1688,12 @@ export function assertModuleSpecifier(
 ): asserts node is t.ModuleSpecifier {
   assert("ModuleSpecifier", node, opts);
 }
+export function assertPrivate(
+  node: object | null | undefined,
+  opts?: object | null,
+): asserts node is t.Private {
+  assert("Private", node, opts);
+}
 export function assertFlow(
   node: object | null | undefined,
   opts?: object | null,
@@ -1723,12 +1741,6 @@ export function assertJSX(
   opts?: object | null,
 ): asserts node is t.JSX {
   assert("JSX", node, opts);
-}
-export function assertPrivate(
-  node: object | null | undefined,
-  opts?: object | null,
-): asserts node is t.Private {
-  assert("Private", node, opts);
 }
 export function assertTSTypeElement(
   node: object | null | undefined,

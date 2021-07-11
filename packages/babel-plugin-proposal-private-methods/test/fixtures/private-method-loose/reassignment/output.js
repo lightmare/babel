@@ -1,6 +1,6 @@
 var counter = 0;
 
-var _privateMethod = babelHelpers.classPrivateFieldLooseKey("privateMethod");
+var _privateMethod = /*#__PURE__*/babelHelpers.classPrivateFieldLooseKey("privateMethod");
 
 class Foo {
   constructor() {
@@ -12,6 +12,6 @@ class Foo {
 
 }
 
-var _privateMethod2 = function _privateMethod2() {
+function _privateMethod2() {
   return 42;
-};
+}

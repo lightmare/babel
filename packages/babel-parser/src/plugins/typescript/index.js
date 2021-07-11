@@ -10,7 +10,7 @@ import type State from "../../tokenizer/state";
 import { types as tt } from "../../tokenizer/types";
 import { types as ct } from "../../tokenizer/context";
 import * as N from "../../types";
-import type { Pos, Position } from "../../util/location";
+import type { Position } from "../../util/location";
 import type Parser from "../../parser";
 import {
   type BindingTypes,
@@ -29,13 +29,19 @@ import TypeScriptScopeHandler from "./scope";
 import * as charCodes from "charcodes";
 import type { ExpressionErrors } from "../../parser/util";
 import { PARAM } from "../../util/production-parameter";
-import { Errors } from "../../parser/error";
+import {
+  Errors,
+  makeErrorTemplates,
+  type ErrorTemplate,
+  ErrorCodes,
+} from "../../parser/error";
 
 type TsModifier =
   | "readonly"
   | "abstract"
   | "declare"
   | "static"
+  | "override"
   | N.Accessibility;
 
 function nonNull<T>(x: ?T): T {
@@ -59,65 +65,95 @@ type ParsingContext =
   | "TypeMembers"
   | "TypeParametersOrArguments";
 
-const TSErrors = Object.freeze({
-  AbstractMethodHasImplementation:
-    "Method '%0' cannot have an implementation because it is marked abstract.",
-  ClassMethodHasDeclare: "Class methods cannot have the 'declare' modifier",
-  ClassMethodHasReadonly: "Class methods cannot have the 'readonly' modifier",
-  ConstructorHasTypeParameters:
-    "Type parameters cannot appear on a constructor declaration.",
-  DeclareClassFieldHasInitializer:
-    "Initializers are not allowed in ambient contexts.",
-  DeclareFunctionHasImplementation:
-    "An implementation cannot be declared in ambient contexts.",
-  DuplicateModifier: "Duplicate modifier: '%0'",
-  DuplicateAccessibilityModifier: "Accessibility modifier already seen.",
-  EmptyHeritageClauseType: "'%0' list cannot be empty.",
-  EmptyTypeArguments: "Type argument list cannot be empty.",
-  EmptyTypeParameters: "Type parameter list cannot be empty.",
-  ExpectedAmbientAfterExportDeclare:
-    "'export declare' must be followed by an ambient declaration.",
-  IndexSignatureHasAbstract:
-    "Index signatures cannot have the 'abstract' modifier",
-  IndexSignatureHasAccessibility:
-    "Index signatures cannot have an accessibility modifier ('%0')",
-  IndexSignatureHasStatic: "Index signatures cannot have the 'static' modifier",
-  IndexSignatureHasDeclare:
-    "Index signatures cannot have the 'declare' modifier",
-  InvalidModifierOnTypeMember: "'%0' modifier cannot appear on a type member.",
-  InvalidTupleMemberLabel:
-    "Tuple members must be labeled with a simple identifier.",
-  MixedLabeledAndUnlabeledElements:
-    "Tuple members must all have names or all not have names.",
-  NonAbstractClassHasAbstractMethod:
-    "Abstract methods can only appear within an abstract class.",
-  NonClassMethodPropertyHasAbstractModifer:
-    "'abstract' modifier can only appear on a class, method, or property declaration.",
-  OptionalTypeBeforeRequired:
-    "A required element cannot follow an optional element.",
-  PatternIsOptional:
-    "A binding pattern parameter cannot be optional in an implementation signature.",
-  PrivateElementHasAbstract:
-    "Private elements cannot have the 'abstract' modifier.",
-  PrivateElementHasAccessibility:
-    "Private elements cannot have an accessibility modifier ('%0')",
-  ReadonlyForMethodSignature:
-    "'readonly' modifier can only appear on a property declaration or index signature.",
-  TypeAnnotationAfterAssign:
-    "Type annotations must come before default assignments, e.g. instead of `age = 25: number` use `age: number = 25`",
-  UnexpectedParameterModifier:
-    "A parameter property is only allowed in a constructor implementation.",
-  UnexpectedReadonly:
-    "'readonly' type modifier is only permitted on array and tuple literal types.",
-  UnexpectedTypeAnnotation: "Did not expect a type annotation here.",
-  UnexpectedTypeCastInParameter: "Unexpected type cast in parameter position.",
-  UnsupportedImportTypeArgument:
-    "Argument in a type import must be a string literal",
-  UnsupportedParameterPropertyKind:
-    "A parameter property may not be declared using a binding pattern.",
-  UnsupportedSignatureParameterKind:
-    "Name in a signature must be an Identifier, ObjectPattern or ArrayPattern, instead got %0",
-});
+/* eslint sort-keys: "error" */
+const TSErrors = makeErrorTemplates(
+  {
+    AbstractMethodHasImplementation:
+      "Method '%0' cannot have an implementation because it is marked abstract.",
+    AccesorCannotDeclareThisParameter:
+      "'get' and 'set' accessors cannot declare 'this' parameters.",
+    AccesorCannotHaveTypeParameters: "An accessor cannot have type parameters.",
+    ClassMethodHasDeclare: "Class methods cannot have the 'declare' modifier.",
+    ClassMethodHasReadonly:
+      "Class methods cannot have the 'readonly' modifier.",
+    ConstructorHasTypeParameters:
+      "Type parameters cannot appear on a constructor declaration.",
+    DeclareAccessor: "'declare' is not allowed in %0ters.",
+    DeclareClassFieldHasInitializer:
+      "Initializers are not allowed in ambient contexts.",
+    DeclareFunctionHasImplementation:
+      "An implementation cannot be declared in ambient contexts.",
+    DuplicateAccessibilityModifier: "Accessibility modifier already seen.",
+    DuplicateModifier: "Duplicate modifier: '%0'.",
+    EmptyHeritageClauseType: "'%0' list cannot be empty.",
+    EmptyTypeArguments: "Type argument list cannot be empty.",
+    EmptyTypeParameters: "Type parameter list cannot be empty.",
+    ExpectedAmbientAfterExportDeclare:
+      "'export declare' must be followed by an ambient declaration.",
+    ImportAliasHasImportType: "An import alias can not use 'import type'.",
+    IncompatibleModifiers: "'%0' modifier cannot be used with '%1' modifier.",
+    IndexSignatureHasAbstract:
+      "Index signatures cannot have the 'abstract' modifier.",
+    IndexSignatureHasAccessibility:
+      "Index signatures cannot have an accessibility modifier ('%0').",
+    IndexSignatureHasDeclare:
+      "Index signatures cannot have the 'declare' modifier.",
+    IndexSignatureHasOverride:
+      "'override' modifier cannot appear on an index signature.",
+    IndexSignatureHasStatic:
+      "Index signatures cannot have the 'static' modifier.",
+    InvalidModifierOnTypeMember:
+      "'%0' modifier cannot appear on a type member.",
+    InvalidModifiersOrder: "'%0' modifier must precede '%1' modifier.",
+    InvalidTupleMemberLabel:
+      "Tuple members must be labeled with a simple identifier.",
+    MixedLabeledAndUnlabeledElements:
+      "Tuple members must all have names or all not have names.",
+    NonAbstractClassHasAbstractMethod:
+      "Abstract methods can only appear within an abstract class.",
+    NonClassMethodPropertyHasAbstractModifer:
+      "'abstract' modifier can only appear on a class, method, or property declaration.",
+    OptionalTypeBeforeRequired:
+      "A required element cannot follow an optional element.",
+    OverrideNotInSubClass:
+      "This member cannot have an 'override' modifier because its containing class does not extend another class.",
+    PatternIsOptional:
+      "A binding pattern parameter cannot be optional in an implementation signature.",
+    PrivateElementHasAbstract:
+      "Private elements cannot have the 'abstract' modifier.",
+    PrivateElementHasAccessibility:
+      "Private elements cannot have an accessibility modifier ('%0').",
+    ReadonlyForMethodSignature:
+      "'readonly' modifier can only appear on a property declaration or index signature.",
+    SetAccesorCannotHaveOptionalParameter:
+      "A 'set' accessor cannot have an optional parameter.",
+    SetAccesorCannotHaveRestParameter:
+      "A 'set' accessor cannot have rest parameter.",
+    SetAccesorCannotHaveReturnType:
+      "A 'set' accessor cannot have a return type annotation.",
+    StaticBlockCannotHaveModifier:
+      "Static class blocks cannot have any modifier.",
+    TypeAnnotationAfterAssign:
+      "Type annotations must come before default assignments, e.g. instead of `age = 25: number` use `age: number = 25`.",
+    TypeImportCannotSpecifyDefaultAndNamed:
+      "A type-only import can specify a default import or named bindings, but not both.",
+    UnexpectedParameterModifier:
+      "A parameter property is only allowed in a constructor implementation.",
+    UnexpectedReadonly:
+      "'readonly' type modifier is only permitted on array and tuple literal types.",
+    UnexpectedTypeAnnotation: "Did not expect a type annotation here.",
+    UnexpectedTypeCastInParameter:
+      "Unexpected type cast in parameter position.",
+    UnsupportedImportTypeArgument:
+      "Argument in a type import must be a string literal.",
+    UnsupportedParameterPropertyKind:
+      "A parameter property may not be declared using a binding pattern.",
+    UnsupportedSignatureParameterKind:
+      "Name in a signature must be an Identifier, ObjectPattern or ArrayPattern, instead got %0.",
+  },
+  /* code */ ErrorCodes.SyntaxError,
+);
+/* eslint-disable sort-keys */
 
 // Doesn't handle "void" or "null" because those are keywords, not identifiers.
 // It also doesn't handle "intrinsic", since usually it's not a keyword.
@@ -168,21 +204,25 @@ export default (superClass: Class<Parser>): Class<Parser> =>
       return this.match(tt.name);
     }
 
+    tsTokenCanFollowModifier() {
+      return (
+        (this.match(tt.bracketL) ||
+          this.match(tt.braceL) ||
+          this.match(tt.star) ||
+          this.match(tt.ellipsis) ||
+          this.match(tt.privateName) ||
+          this.isLiteralPropertyName()) &&
+        !this.hasPrecedingLineBreak()
+      );
+    }
+
     tsNextTokenCanFollowModifier() {
       // Note: TypeScript's implementation is much more complicated because
       // more things are considered modifiers there.
       // This implementation only handles modifiers not handled by @babel/parser itself. And "static".
       // TODO: Would be nice to avoid lookahead. Want a hasLineBreakUpNext() method...
       this.next();
-      return (
-        (this.match(tt.bracketL) ||
-          this.match(tt.braceL) ||
-          this.match(tt.star) ||
-          this.match(tt.ellipsis) ||
-          this.match(tt.hash) ||
-          this.isLiteralPropertyName()) &&
-        !this.hasPrecedingLineBreak()
-      );
+      return this.tsTokenCanFollowModifier();
     }
 
     /** Parses a modifier matching one the given modifier names. */
@@ -213,8 +253,22 @@ export default (superClass: Class<Parser>): Class<Parser> =>
       },
       allowedModifiers: TsModifier[],
       disallowedModifiers?: TsModifier[],
-      errorTemplate?: string,
+      errorTemplate?: ErrorTemplate,
     ): void {
+      const enforceOrder = (pos, modifier, before, after) => {
+        if (modifier === before && modified[after]) {
+          this.raise(pos, TSErrors.InvalidModifiersOrder, before, after);
+        }
+      };
+      const incompatible = (pos, modifier, mod1, mod2) => {
+        if (
+          (modified[mod1] && modifier === mod2) ||
+          (modified[mod2] && modifier === mod1)
+        ) {
+          this.raise(pos, TSErrors.IncompatibleModifiers, mod1, mod2);
+        }
+      };
+
       for (;;) {
         const startPos = this.state.start;
         const modifier: ?TsModifier = this.tsParseModifier(
@@ -227,11 +281,23 @@ export default (superClass: Class<Parser>): Class<Parser> =>
           if (modified.accessibility) {
             this.raise(startPos, TSErrors.DuplicateAccessibilityModifier);
           } else {
+            enforceOrder(startPos, modifier, modifier, "override");
+            enforceOrder(startPos, modifier, modifier, "static");
+            enforceOrder(startPos, modifier, modifier, "readonly");
+
             modified.accessibility = modifier;
           }
         } else {
           if (Object.hasOwnProperty.call(modified, modifier)) {
             this.raise(startPos, TSErrors.DuplicateModifier, modifier);
+          } else {
+            enforceOrder(startPos, modifier, "static", "readonly");
+            enforceOrder(startPos, modifier, "static", "override");
+            enforceOrder(startPos, modifier, "override", "readonly");
+            enforceOrder(startPos, modifier, "abstract", "override");
+
+            incompatible(startPos, modifier, "declare", "override");
+            incompatible(startPos, modifier, "static", "abstract");
           }
           modified[modifier] = true;
         }
@@ -419,7 +485,7 @@ export default (superClass: Class<Parser>): Class<Parser> =>
 
     tsParseTypeParameter(): N.TsTypeParameter {
       const node: N.TsTypeParameter = this.startNode();
-      node.name = this.parseIdentifierName(node.start);
+      node.name = this.tsParseTypeParameterName();
       node.constraint = this.tsEatThenParseType(tt._extends);
       node.default = this.tsEatThenParseType(tt.eq);
       return this.finishNode(node, "TSTypeParameter");
@@ -472,13 +538,11 @@ export default (superClass: Class<Parser>): Class<Parser> =>
       this.expect(tt.parenL);
       signature.parameters = this.tsParseBindingListForSignature();
       if (returnTokenRequired) {
-        signature.typeAnnotation = this.tsParseTypeOrTypePredicateAnnotation(
-          returnToken,
-        );
+        signature.typeAnnotation =
+          this.tsParseTypeOrTypePredicateAnnotation(returnToken);
       } else if (this.match(returnToken)) {
-        signature.typeAnnotation = this.tsParseTypeOrTypePredicateAnnotation(
-          returnToken,
-        );
+        signature.typeAnnotation =
+          this.tsParseTypeOrTypePredicateAnnotation(returnToken);
       }
     }
 
@@ -505,8 +569,8 @@ export default (superClass: Class<Parser>): Class<Parser> =>
     }
 
     tsParseTypeMemberSemicolon(): void {
-      if (!this.eat(tt.comma)) {
-        this.semicolon();
+      if (!this.eat(tt.comma) && !this.isLineTerminator()) {
+        this.expect(tt.semi);
       }
     }
 
@@ -560,8 +624,57 @@ export default (superClass: Class<Parser>): Class<Parser> =>
           this.raise(node.start, TSErrors.ReadonlyForMethodSignature);
         }
         const method: N.TsMethodSignature = nodeAny;
+        if (method.kind && this.isRelational("<")) {
+          this.raise(this.state.pos, TSErrors.AccesorCannotHaveTypeParameters);
+        }
         this.tsFillSignature(tt.colon, method);
         this.tsParseTypeMemberSemicolon();
+        if (method.kind === "get") {
+          if (method.parameters.length > 0) {
+            this.raise(this.state.pos, Errors.BadGetterArity);
+            if (this.isThisParam(method.parameters[0])) {
+              this.raise(
+                this.state.pos,
+                TSErrors.AccesorCannotDeclareThisParameter,
+              );
+            }
+          }
+        } else if (method.kind === "set") {
+          if (method.parameters.length !== 1) {
+            this.raise(this.state.pos, Errors.BadSetterArity);
+          } else {
+            const firstParameter = method.parameters[0];
+            if (this.isThisParam(firstParameter)) {
+              this.raise(
+                this.state.pos,
+                TSErrors.AccesorCannotDeclareThisParameter,
+              );
+            }
+            if (
+              firstParameter.type === "Identifier" &&
+              firstParameter.optional
+            ) {
+              this.raise(
+                this.state.pos,
+                TSErrors.SetAccesorCannotHaveOptionalParameter,
+              );
+            }
+            if (firstParameter.type === "RestElement") {
+              this.raise(
+                this.state.pos,
+                TSErrors.SetAccesorCannotHaveRestParameter,
+              );
+            }
+          }
+          if (method.typeAnnotation) {
+            this.raise(
+              method.typeAnnotation.start,
+              TSErrors.SetAccesorCannotHaveReturnType,
+            );
+          }
+        } else {
+          method.kind = "method";
+        }
         return this.finishNode(method, "TSMethodSignature");
       } else {
         const property: N.TsPropertySignature = nodeAny;
@@ -597,7 +710,15 @@ export default (superClass: Class<Parser>): Class<Parser> =>
       this.tsParseModifiers(
         node,
         ["readonly"],
-        ["declare", "abstract", "private", "protected", "public", "static"],
+        [
+          "declare",
+          "abstract",
+          "private",
+          "protected",
+          "public",
+          "static",
+          "override",
+        ],
         TSErrors.InvalidModifierOnTypeMember,
       );
 
@@ -607,6 +728,15 @@ export default (superClass: Class<Parser>): Class<Parser> =>
       }
 
       this.parsePropertyName(node, /* isPrivateNameAllowed */ false);
+      if (
+        !node.computed &&
+        node.key.type === "Identifier" &&
+        (node.key.name === "get" || node.key.name === "set") &&
+        this.tsTokenCanFollowModifier()
+      ) {
+        node.kind = node.key.name;
+        this.parsePropertyName(node, /* isPrivateNameAllowed */ false);
+      }
       return this.tsParsePropertyOrMethodSignature(node, !!node.readonly);
     }
 
@@ -647,7 +777,7 @@ export default (superClass: Class<Parser>): Class<Parser> =>
 
     tsParseMappedTypeParameter(): N.TsTypeParameter {
       const node: N.TsTypeParameter = this.startNode();
-      node.name = this.parseIdentifierName(node.start);
+      node.name = this.tsParseTypeParameterName();
       node.constraint = this.tsExpectThenParseType(tt._in);
       return this.finishNode(node, "TSTypeParameter");
     }
@@ -961,7 +1091,7 @@ export default (superClass: Class<Parser>): Class<Parser> =>
       const node = this.startNode();
       this.expectContextual("infer");
       const typeParameter = this.startNode();
-      typeParameter.name = this.parseIdentifierName(typeParameter.start);
+      typeParameter.name = this.tsParseTypeParameterName();
       node.typeParameter = this.finishNode(typeParameter, "TSTypeParameter");
       return this.finishNode(node, "TSInferType");
     }
@@ -1113,6 +1243,7 @@ export default (superClass: Class<Parser>): Class<Parser> =>
           if (thisTypePredicate.type === "TSThisType") {
             node.parameterName = (thisTypePredicate: N.TsThisType);
             node.asserts = true;
+            (node: N.TsTypePredicate).typeAnnotation = null;
             thisTypePredicate = this.finishNode(node, "TSTypePredicate");
           } else {
             this.resetStartLocationFromNode(thisTypePredicate, node);
@@ -1135,6 +1266,7 @@ export default (superClass: Class<Parser>): Class<Parser> =>
           // : asserts foo
           node.parameterName = this.parseIdentifier();
           node.asserts = asserts;
+          (node: N.TsTypePredicate).typeAnnotation = null;
           t.typeAnnotation = this.finishNode(node, "TSTypePredicate");
           return this.finishNode(t, "TSTypeAnnotation");
         }
@@ -1482,7 +1614,14 @@ export default (superClass: Class<Parser>): Class<Parser> =>
       node.id = this.parseIdentifier();
       this.checkLVal(node.id, "import equals declaration", BIND_LEXICAL);
       this.expect(tt.eq);
-      node.moduleReference = this.tsParseModuleReference();
+      const moduleReference = this.tsParseModuleReference();
+      if (
+        node.importKind === "type" &&
+        moduleReference.type !== "TSExternalModuleReference"
+      ) {
+        this.raise(moduleReference.start, TSErrors.ImportAliasHasImportType);
+      }
+      node.moduleReference = moduleReference;
       this.semicolon();
       return this.finishNode(node, "TSImportEqualsDeclaration");
     }
@@ -1553,7 +1692,7 @@ export default (superClass: Class<Parser>): Class<Parser> =>
         kind = "let";
       }
 
-      return this.tsInDeclareContext(() => {
+      return this.tsInAmbientContext(() => {
         switch (starttype) {
           case tt._function:
             nany.declare = true;
@@ -1749,9 +1888,6 @@ export default (superClass: Class<Parser>): Class<Parser> =>
       if (node.params.length === 0) {
         this.raise(node.start, TSErrors.EmptyTypeArguments);
       }
-      // This reads the next token after the `>` too, so do this in the enclosing context.
-      // But be sure not to parse a regex in the jsx expression `<C<number> />`, so set exprAllowed = false
-      this.state.exprAllowed = false;
       this.expectRelational(">");
       return this.finishNode(node, "TSTypeParameterInstantiation");
     }
@@ -1792,10 +1928,23 @@ export default (superClass: Class<Parser>): Class<Parser> =>
 
       let accessibility: ?N.Accessibility;
       let readonly = false;
+      let override = false;
       if (allowModifiers !== undefined) {
-        accessibility = this.parseAccessModifier();
-        readonly = !!this.tsParseModifier(["readonly"]);
-        if (allowModifiers === false && (accessibility || readonly)) {
+        const modified = {};
+        this.tsParseModifiers(modified, [
+          "public",
+          "private",
+          "protected",
+          "override",
+          "readonly",
+        ]);
+        accessibility = modified.accessibility;
+        override = modified.override;
+        readonly = modified.readonly;
+        if (
+          allowModifiers === false &&
+          (accessibility || readonly || override)
+        ) {
           this.raise(startPos, TSErrors.UnexpectedParameterModifier);
         }
       }
@@ -1803,13 +1952,14 @@ export default (superClass: Class<Parser>): Class<Parser> =>
       const left = this.parseMaybeDefault();
       this.parseAssignableListItemTypes(left);
       const elt = this.parseMaybeDefault(left.start, left.loc.start, left);
-      if (accessibility || readonly) {
+      if (accessibility || readonly || override) {
         const pp: N.TSParameterProperty = this.startNodeAt(startPos, startLoc);
         if (decorators.length) {
           pp.decorators = decorators;
         }
         if (accessibility) pp.accessibility = accessibility;
         if (readonly) pp.readonly = readonly;
+        if (override) pp.override = override;
         if (elt.type !== "Identifier" && elt.type !== "AssignmentPattern") {
           this.raise(pp.start, TSErrors.UnsupportedParameterPropertyKind);
         }
@@ -1843,7 +1993,7 @@ export default (superClass: Class<Parser>): Class<Parser> =>
         this.finishNode(node, bodilessType);
         return;
       }
-      if (bodilessType === "TSDeclareFunction" && this.state.isDeclareContext) {
+      if (bodilessType === "TSDeclareFunction" && this.state.isAmbientContext) {
         this.raise(node.start, TSErrors.DeclareFunctionHasImplementation);
         if (
           // $FlowIgnore
@@ -1908,6 +2058,9 @@ export default (superClass: Class<Parser>): Class<Parser> =>
       state: N.ParseSubscriptState,
     ): N.Expression {
       if (!this.hasPrecedingLineBreak() && this.match(tt.bang)) {
+        // When ! is consumed as a postfix operator (non-null assertion),
+        // disallow JSX tag forming after. e.g. When parsing `p! < n.p!`
+        // `<n.p` can not be a start of JSX tag
         this.state.exprAllowed = false;
         this.next();
 
@@ -2052,27 +2205,27 @@ export default (superClass: Class<Parser>): Class<Parser> =>
     checkDuplicateExports() {}
 
     parseImport(node: N.Node): N.AnyImport {
+      node.importKind = "value";
       if (this.match(tt.name) || this.match(tt.star) || this.match(tt.braceL)) {
-        const ahead = this.lookahead();
-
-        if (this.match(tt.name) && ahead.type === tt.eq) {
-          return this.tsParseImportEqualsDeclaration(node);
-        }
+        let ahead = this.lookahead();
 
         if (
           this.isContextual("type") &&
           // import type, { a } from "b";
           ahead.type !== tt.comma &&
           // import type from "a";
-          !(ahead.type === tt.name && ahead.value === "from")
+          !(ahead.type === tt.name && ahead.value === "from") &&
+          // import type = require("a");
+          ahead.type !== tt.eq
         ) {
           node.importKind = "type";
           this.next();
+          ahead = this.lookahead();
         }
-      }
 
-      if (!node.importKind) {
-        node.importKind = "value";
+        if (this.match(tt.name) && ahead.type === tt.eq) {
+          return this.tsParseImportEqualsDeclaration(node);
+        }
       }
 
       const importNode = super.parseImport(node);
@@ -2087,7 +2240,7 @@ export default (superClass: Class<Parser>): Class<Parser> =>
       ) {
         this.raise(
           importNode.start,
-          "A type-only import can specify a default import or named bindings, but not both.",
+          TSErrors.TypeImportCannotSpecifyDefaultAndNamed,
         );
       }
 
@@ -2097,7 +2250,16 @@ export default (superClass: Class<Parser>): Class<Parser> =>
     parseExport(node: N.Node): N.AnyExport {
       if (this.match(tt._import)) {
         // `export import A = B;`
-        this.expect(tt._import);
+        this.next(); // eat `tt._import`
+        if (
+          this.isContextual("type") &&
+          this.lookaheadCharCode() !== charCodes.equalsTo
+        ) {
+          node.importKind = "type";
+          this.next(); // eat "type"
+        } else {
+          node.importKind = "value";
+        }
         return this.tsParseImportEqualsDeclaration(node, /* isExport */ true);
       } else if (this.eat(tt.eq)) {
         // `export = x;`
@@ -2172,25 +2334,49 @@ export default (superClass: Class<Parser>): Class<Parser> =>
       return this.tsParseModifier(["public", "protected", "private"]);
     }
 
+    tsHasSomeModifiers(member: any, modifiers: TsModifier[]): boolean {
+      return modifiers.some(modifier => {
+        if (tsIsAccessModifier(modifier)) {
+          return member.accessibility === modifier;
+        }
+        return !!member[modifier];
+      });
+    }
+
     parseClassMember(
       classBody: N.ClassBody,
       member: any,
       state: N.ParseClassMemberState,
     ): void {
-      this.tsParseModifiers(member, [
+      const invalidModifersForStaticBlocks = [
         "declare",
         "private",
         "public",
         "protected",
-      ]);
+        "override",
+        "abstract",
+        "readonly",
+      ];
+      this.tsParseModifiers(
+        member,
+        invalidModifersForStaticBlocks.concat(["static"]),
+      );
 
-      const callParseClassMember = () => {
-        super.parseClassMember(classBody, member, state);
+      const callParseClassMemberWithIsStatic = () => {
+        const isStatic = !!member.static;
+        if (isStatic && this.eat(tt.braceL)) {
+          if (this.tsHasSomeModifiers(member, invalidModifersForStaticBlocks)) {
+            this.raise(this.state.pos, TSErrors.StaticBlockCannotHaveModifier);
+          }
+          this.parseClassStaticBlock(classBody, ((member: any): N.StaticBlock));
+        } else {
+          this.parseClassMemberWithIsStatic(classBody, member, state, isStatic);
+        }
       };
       if (member.declare) {
-        this.tsInDeclareContext(callParseClassMember);
+        this.tsInAmbientContext(callParseClassMemberWithIsStatic);
       } else {
-        callParseClassMember();
+        callParseClassMemberWithIsStatic();
       }
     }
 
@@ -2200,17 +2386,12 @@ export default (superClass: Class<Parser>): Class<Parser> =>
       state: N.ParseClassMemberState,
       isStatic: boolean,
     ): void {
-      this.tsParseModifiers(member, ["abstract", "readonly", "declare"]);
-
       const idx = this.tsTryParseIndexSignature(member);
       if (idx) {
         classBody.body.push(idx);
 
         if ((member: any).abstract) {
           this.raise(member.start, TSErrors.IndexSignatureHasAbstract);
-        }
-        if (isStatic) {
-          this.raise(member.start, TSErrors.IndexSignatureHasStatic);
         }
         if ((member: any).accessibility) {
           this.raise(
@@ -2222,12 +2403,21 @@ export default (superClass: Class<Parser>): Class<Parser> =>
         if ((member: any).declare) {
           this.raise(member.start, TSErrors.IndexSignatureHasDeclare);
         }
+        if ((member: any).override) {
+          this.raise(member.start, TSErrors.IndexSignatureHasOverride);
+        }
 
         return;
       }
 
       if (!this.state.inAbstractClass && (member: any).abstract) {
         this.raise(member.start, TSErrors.NonAbstractClassHasAbstractMethod);
+      }
+
+      if ((member: any).override) {
+        if (!state.hadSuperClass) {
+          this.raise(member.start, TSErrors.OverrideNotInSubClass);
+        }
       }
 
       /*:: invariant(member.type !== "TSIndexSignature") */
@@ -2277,16 +2467,16 @@ export default (superClass: Class<Parser>): Class<Parser> =>
       expr: N.Expression,
       startPos: number,
       startLoc: Position,
-      refNeedsArrowPos?: ?Pos,
+      refExpressionErrors?: ?ExpressionErrors,
     ): N.Expression {
       // only do the expensive clone if there is a question mark
       // and if we come from inside parens
-      if (!refNeedsArrowPos || !this.match(tt.question)) {
+      if (!this.state.maybeInArrowParameters || !this.match(tt.question)) {
         return super.parseConditional(
           expr,
           startPos,
           startLoc,
-          refNeedsArrowPos,
+          refExpressionErrors,
         );
       }
 
@@ -2295,8 +2485,11 @@ export default (superClass: Class<Parser>): Class<Parser> =>
       );
 
       if (!result.node) {
-        // $FlowIgnore
-        refNeedsArrowPos.start = result.error.pos || this.state.start;
+        if (result.error) {
+          /*:: invariant(refExpressionErrors != null) */
+          super.setOptionalParametersError(refExpressionErrors, result.error);
+        }
+
         return expr;
       }
       if (result.error) this.state = result.failState;
@@ -2411,7 +2604,7 @@ export default (superClass: Class<Parser>): Class<Parser> =>
     parseClassProperty(node: N.ClassProperty): N.ClassProperty {
       this.parseClassPropertyAnnotation(node);
 
-      if (this.state.isDeclareContext && this.match(tt.eq)) {
+      if (this.state.isAmbientContext && this.match(tt.eq)) {
         this.raise(this.state.start, TSErrors.DeclareClassFieldHasInitializer);
       }
 
@@ -2450,6 +2643,11 @@ export default (superClass: Class<Parser>): Class<Parser> =>
       const typeParameters = this.tsTryParseTypeParameters();
       if (typeParameters && isConstructor) {
         this.raise(typeParameters.start, TSErrors.ConstructorHasTypeParameters);
+      }
+
+      // $FlowIgnore
+      if (method.declare && (method.kind === "get" || method.kind === "set")) {
+        this.raise(method.start, TSErrors.DeclareAccessor, method.kind);
       }
       if (typeParameters) method.typeParameters = typeParameters;
       super.pushClassMethod(
@@ -2539,8 +2737,9 @@ export default (superClass: Class<Parser>): Class<Parser> =>
         state = this.state.clone();
 
         jsx = this.tryParse(() => super.parseMaybeAssign(...args), state);
-        /*:: invariant(!jsx.aborted) */
 
+        /*:: invariant(!jsx.aborted) */
+        /*:: invariant(jsx.node != null) */
         if (!jsx.error) return jsx.node;
 
         // Remove `tc.j_expr` and `tc.j_oTag` from context added
@@ -2570,7 +2769,7 @@ export default (superClass: Class<Parser>): Class<Parser> =>
 
         if (
           expr.type !== "ArrowFunctionExpression" ||
-          (expr.extra && expr.extra.parenthesized)
+          expr.extra?.parenthesized
         ) {
           abort();
         }
@@ -2583,6 +2782,7 @@ export default (superClass: Class<Parser>): Class<Parser> =>
         return expr;
       }, state);
 
+      /*:: invariant(arrow.node != null) */
       if (!arrow.error && !arrow.aborted) return arrow.node;
 
       if (!jsx) {
@@ -2595,6 +2795,7 @@ export default (superClass: Class<Parser>): Class<Parser> =>
         // But don't directly call `this.tsParseTypeAssertion` because we want to handle any binary after it.
         typeCast = this.tryParse(() => super.parseMaybeAssign(...args), state);
         /*:: invariant(!typeCast.aborted) */
+        /*:: invariant(typeCast.node != null) */
         if (!typeCast.error) return typeCast.node;
       }
 
@@ -2661,7 +2862,7 @@ export default (superClass: Class<Parser>): Class<Parser> =>
       if (this.eat(tt.question)) {
         if (
           param.type !== "Identifier" &&
-          !this.state.isDeclareContext &&
+          !this.state.isAmbientContext &&
           !this.state.inType
         ) {
           this.raise(param.start, TSErrors.PatternIsOptional);
@@ -2682,9 +2883,24 @@ export default (superClass: Class<Parser>): Class<Parser> =>
           return super.toAssignable(this.typeCastToParameter(node), isLHS);
         case "TSParameterProperty":
           return super.toAssignable(node, isLHS);
+        case "ParenthesizedExpression":
+          return this.toAssignableParenthesizedExpression(node, isLHS);
         case "TSAsExpression":
         case "TSNonNullExpression":
         case "TSTypeAssertion":
+          node.expression = this.toAssignable(node.expression, isLHS);
+          return node;
+        default:
+          return super.toAssignable(node, isLHS);
+      }
+    }
+
+    toAssignableParenthesizedExpression(node: N.Node, isLHS: boolean) {
+      switch (node.expression.type) {
+        case "TSAsExpression":
+        case "TSNonNullExpression":
+        case "TSTypeAssertion":
+        case "ParenthesizedExpression":
           node.expression = this.toAssignable(node.expression, isLHS);
           return node;
         default:
@@ -2709,8 +2925,18 @@ export default (superClass: Class<Parser>): Class<Parser> =>
           this.checkLVal(expr.parameter, "parameter property", ...args);
           return;
         case "TSAsExpression":
-        case "TSNonNullExpression":
         case "TSTypeAssertion":
+          if (
+            /*bindingType*/ !args[0] &&
+            contextDescription !== "parenthesized expression" &&
+            !expr.extra?.parenthesized
+          ) {
+            this.raise(expr.start, Errors.InvalidLhs, contextDescription);
+            break;
+          }
+          this.checkLVal(expr.expression, "parenthesized expression", ...args);
+          return;
+        case "TSNonNullExpression":
           this.checkLVal(expr.expression, contextDescription, ...args);
           return;
         default:
@@ -2743,6 +2969,18 @@ export default (superClass: Class<Parser>): Class<Parser> =>
       }
 
       return super.parseMaybeDecoratorArguments(expr);
+    }
+
+    checkCommaAfterRest(close) {
+      if (
+        this.state.isAmbientContext &&
+        this.match(tt.comma) &&
+        this.lookaheadCharCode() === close
+      ) {
+        this.next();
+      } else {
+        super.checkCommaAfterRest(close);
+      }
     }
 
     // === === === === === === === === === === === === === === === ===
@@ -2864,10 +3102,7 @@ export default (superClass: Class<Parser>): Class<Parser> =>
       const baseCount = super.getGetterSetterExpectedParamCount(method);
       const params = this.getObjectOrClassMethodParams(method);
       const firstParam = params[0];
-      const hasContextParam =
-        firstParam &&
-        firstParam.type === "Identifier" &&
-        firstParam.name === "this";
+      const hasContextParam = firstParam && this.isThisParam(firstParam);
 
       return hasContextParam ? baseCount + 1 : baseCount;
     }
@@ -2884,13 +3119,13 @@ export default (superClass: Class<Parser>): Class<Parser> =>
       return param;
     }
 
-    tsInDeclareContext<T>(cb: () => T): T {
-      const oldIsDeclareContext = this.state.isDeclareContext;
-      this.state.isDeclareContext = true;
+    tsInAmbientContext<T>(cb: () => T): T {
+      const oldIsAmbientContext = this.state.isAmbientContext;
+      this.state.isAmbientContext = true;
       try {
         return cb();
       } finally {
-        this.state.isDeclareContext = oldIsDeclareContext;
+        this.state.isAmbientContext = oldIsAmbientContext;
       }
     }
 
@@ -2954,5 +3189,28 @@ export default (superClass: Class<Parser>): Class<Parser> =>
         }
       }
       return method;
+    }
+
+    tsParseTypeParameterName(): N.Identifier | string {
+      const typeName: N.Identifier = this.parseIdentifier();
+      return process.env.BABEL_8_BREAKING ? typeName : typeName.name;
+    }
+
+    shouldParseAsAmbientContext(): boolean {
+      return !!this.getPluginOption("typescript", "dts");
+    }
+
+    parse() {
+      if (this.shouldParseAsAmbientContext()) {
+        this.state.isAmbientContext = true;
+      }
+      return super.parse();
+    }
+
+    getExpression() {
+      if (this.shouldParseAsAmbientContext()) {
+        this.state.isAmbientContext = true;
+      }
+      return super.getExpression();
     }
   };

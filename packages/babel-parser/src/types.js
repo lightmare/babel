@@ -16,12 +16,32 @@ import type { ParsingError } from "./parser/error";
  *   - packages/babel-generators/src/generators
  */
 
-export type Comment = {
+type CommentBase = {
   type: "CommentBlock" | "CommentLine",
   value: string,
   start: number,
   end: number,
   loc: SourceLocation,
+};
+
+export type CommentBlock = CommentBase & {
+  type: "CommentBlock",
+};
+
+export type CommentLine = CommentBase & {
+  type: "CommentLine",
+};
+
+export type Comment = CommentBlock | CommentLine;
+
+// A whitespace containing comments
+export type CommentWhitespace = {
+  start: number,
+  end: number,
+  comments: Array<Comment>,
+  leadingNode: Node | null,
+  trailingNode: Node | null,
+  containerNode: Node | null,
 };
 
 export interface NodeBase {
@@ -98,7 +118,8 @@ export type Literal =
   | StringLiteral
   | BooleanLiteral
   | NumericLiteral
-  | BigIntLiteral;
+  | BigIntLiteral
+  | DecimalLiteral;
 
 export type RegExpLiteral = NodeBase & {
   type: "RegExpLiteral",
@@ -127,6 +148,11 @@ export type NumericLiteral = NodeBase & {
 
 export type BigIntLiteral = NodeBase & {
   type: "BigIntLiteral",
+  value: number,
+};
+
+export type DecimalLiteral = NodeBase & {
+  type: "DecimalLiteral",
   value: number,
 };
 
@@ -391,7 +417,7 @@ export type YieldExpression = NodeBase & {
 
 export type AwaitExpression = NodeBase & {
   type: "AwaitExpression",
-  argument: ?Expression,
+  argument: Expression,
 };
 
 export type ArrayExpression = NodeBase & {
@@ -402,6 +428,7 @@ export type ArrayExpression = NodeBase & {
 export type DoExpression = NodeBase & {
   type: "DoExpression",
   body: ?BlockStatement,
+  async: boolean,
 };
 
 export type TupleExpression = NodeBase & {
@@ -735,6 +762,7 @@ export type ClassMemberBase = NodeBase &
     computed: boolean,
     // TypeScript only:
     accessibility?: ?Accessibility,
+    override?: ?true,
     abstract?: ?true,
     optional?: ?true,
   };
@@ -812,6 +840,7 @@ export type ClassPrivateProperty = NodeBase & {
   optional?: true,
   definite?: true,
   readonly?: true,
+  override?: true,
 };
 
 export type OptClassDeclaration = ClassBase &
@@ -956,7 +985,7 @@ export type TsTypeAnnotation = NodeBase & {
 };
 
 export type TypeParameterDeclarationBase = NodeBase & {
-  params: $ReadOnlyArray<TypeParameterBase>,
+  params: $ReadOnlyArray<TypeParameter | TsTypeParameter>,
 };
 
 export type TypeParameterDeclaration = TypeParameterDeclarationBase & {
@@ -969,17 +998,16 @@ export type TsTypeParameterDeclaration = TypeParameterDeclarationBase & {
   params: $ReadOnlyArray<TsTypeParameter>,
 };
 
-export type TypeParameterBase = NodeBase & {
-  name: string,
-};
-
-export type TypeParameter = TypeParameterBase & {
+export type TypeParameter = NodeBase & {
   type: "TypeParameter",
+  name: string,
   default?: TypeAnnotation,
 };
 
-export type TsTypeParameter = TypeParameterBase & {
+export type TsTypeParameter = NodeBase & {
   type: "TSTypeParameter",
+  // TODO(Babel-8): remove string type support
+  name: string | Identifier,
   constraint?: TsType,
   default?: TsType,
 };
@@ -1055,7 +1083,57 @@ export type FlowInterfaceType = NodeBase & {
   body: FlowObjectTypeAnnotation,
 };
 
+export type FlowIndexedAccessType = Node & {
+  type: "IndexedAccessType",
+  objectType: FlowType,
+  indexType: FlowType,
+};
+
+export type FlowOptionalIndexedAccessType = Node & {
+  type: "OptionalIndexedAccessType",
+  objectType: FlowType,
+  indexType: FlowType,
+  optional: boolean,
+};
+
+export type StringLiteralTypeAnnotation = NodeBase & {
+  type: "StringLiteralTypeAnnotation",
+  value: string,
+};
+
+export type BooleanLiteralTypeAnnotation = NodeBase & {
+  type: "BooleanLiteralTypeAnnotation",
+  value: boolean,
+};
+export type NumberLiteralTypeAnnotation = NodeBase & {
+  type: "NumberLiteralTypeAnnotation",
+  value: number,
+};
+
+export type BigIntLiteralTypeAnnotation = NodeBase & {
+  type: "BigIntLiteralTypeAnnotation",
+  //todo(flow): use bigint when Flow supports BigInt
+  value: number,
+};
+
 // ESTree
+export type EstreeLiteral = NodeBase & {
+  type: "Literal",
+  value: any,
+};
+
+type EstreeRegExpLiteralRegex = {
+  pattern: string,
+  flags: string,
+};
+export type EstreeRegExpLiteral = EstreeLiteral & {
+  regex: EstreeRegExpLiteralRegex,
+};
+
+export type EstreeBigIntLiteral = EstreeLiteral & {
+  value: number | null,
+  bigint: string,
+};
 
 export type EstreeProperty = NodeBase & {
   type: "Property",
@@ -1084,6 +1162,7 @@ export type EstreeMethodDefinition = NodeBase & {
 export type EstreeImportExpression = NodeBase & {
   type: "ImportExpression",
   source: Expression,
+  attributes?: Expression | null,
 };
 
 export type EstreePrivateIdentifier = NodeBase & {
@@ -1123,6 +1202,7 @@ export type TSParameterProperty = HasDecorators & {
   // At least one of `accessibility` or `readonly` must be set.
   accessibility?: ?Accessibility,
   readonly?: ?true,
+  override?: ?true,
   parameter: Identifier | AssignmentPattern,
 };
 
@@ -1164,9 +1244,10 @@ export type TsSignatureDeclarationOrIndexSignatureBase = NodeBase & {
   typeAnnotation: ?TsTypeAnnotation,
 };
 
-export type TsSignatureDeclarationBase = TsSignatureDeclarationOrIndexSignatureBase & {
-  typeParameters: ?TsTypeParameterDeclaration,
-};
+export type TsSignatureDeclarationBase =
+  TsSignatureDeclarationOrIndexSignatureBase & {
+    typeParameters: ?TsTypeParameterDeclaration,
+  };
 
 // ================
 // TypeScript type members (for type literal / interface / class)
@@ -1205,11 +1286,13 @@ export type TsPropertySignature = TsNamedTypeElementBase & {
 export type TsMethodSignature = TsSignatureDeclarationBase &
   TsNamedTypeElementBase & {
     type: "TSMethodSignature",
+    kind: "method" | "get" | "set",
   };
 
 // *Not* a ClassMemberBase: Can't have accessibility, can't be abstract, can't be optional.
 export type TsIndexSignature = TsSignatureDeclarationOrIndexSignatureBase & {
   readonly?: true,
+  static?: true,
   type: "TSIndexSignature",
   // Note: parameters.length must be 1.
 };
@@ -1289,7 +1372,7 @@ export type TsTypeReference = TsTypeBase & {
 export type TsTypePredicate = TsTypeBase & {
   type: "TSTypePredicate",
   parameterName: Identifier | TsThisType,
-  typeAnnotation: TsTypeAnnotation,
+  typeAnnotation: TsTypeAnnotation | null,
   asserts: boolean,
 };
 
@@ -1466,6 +1549,7 @@ export type TsImportEqualsDeclaration = NodeBase & {
   type: "TSImportEqualsDeclaration",
   isExport: boolean,
   id: Identifier,
+  importKind: "type" | "value",
   moduleReference: TsModuleReference,
 };
 
@@ -1533,6 +1617,5 @@ export type ParseSubscriptState = {
 
 export type ParseClassMemberState = {|
   hadConstructor: boolean,
-  hadStaticBlock: boolean,
-  constructorAllowsSuper: boolean,
+  hadSuperClass: boolean,
 |};

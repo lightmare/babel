@@ -1,6 +1,6 @@
 var exfiltrated;
 
-var _privateMethod = new WeakSet();
+var _privateMethod = /*#__PURE__*/new WeakSet();
 
 class Foo {
   constructor() {
@@ -13,4 +13,4 @@ class Foo {
 
 }
 
-var _privateMethod2 = function _privateMethod2() {};
+function _privateMethod2() {}

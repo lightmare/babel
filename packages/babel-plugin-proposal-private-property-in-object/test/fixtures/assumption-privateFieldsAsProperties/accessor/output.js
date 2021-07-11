@@ -1,4 +1,4 @@
-var _foo = babelHelpers.classPrivateFieldLooseKey("foo");
+var _foo = /*#__PURE__*/babelHelpers.classPrivateFieldLooseKey("foo");
 
 class Foo {
   constructor() {
@@ -14,4 +14,4 @@ class Foo {
 
 }
 
-var _get_foo = function () {};
+function _get_foo() {}

@@ -1,6 +1,6 @@
 {
   "name": "@babel/runtime-corejs2",
-  "version": "7.13.10",
+  "version": "7.14.6",
   "description": "babel's modular runtime helpers with core-js@2 polyfilling",
   "license": "MIT",
   "publishConfig": {
@@ -12,21 +12,12 @@
     "directory": "packages/babel-runtime-corejs2"
   },
   "homepage": "https://babel.dev/docs/en/next/babel-runtime-corejs2",
-  "author": "Sebastian McKenzie <sebmck@gmail.com>",
+  "author": "The Babel Team (https://babel.dev/team)",
   "dependencies": {
     "core-js": "^2.6.5",
     "regenerator-runtime": "^0.13.4"
   },
   "exports": {
-    "./helpers/typeof": [
-      {
-        "node": "./helpers/typeof.js",
-        "import": "./helpers/esm/typeof.js",
-        "default": "./helpers/typeof.js"
-      },
-      "./helpers/typeof.js"
-    ],
-    "./helpers/esm/typeof": "./helpers/esm/typeof.js",
     "./helpers/jsx": [
       {
         "node": "./helpers/jsx.js",
@@ -36,6 +27,33 @@
       "./helpers/jsx.js"
     ],
     "./helpers/esm/jsx": "./helpers/esm/jsx.js",
+    "./helpers/objectSpread2": [
+      {
+        "node": "./helpers/objectSpread2.js",
+        "import": "./helpers/esm/objectSpread2.js",
+        "default": "./helpers/objectSpread2.js"
+      },
+      "./helpers/objectSpread2.js"
+    ],
+    "./helpers/esm/objectSpread2": "./helpers/esm/objectSpread2.js",
+    "./helpers/typeof": [
+      {
+        "node": "./helpers/typeof.js",
+        "import": "./helpers/esm/typeof.js",
+        "default": "./helpers/typeof.js"
+      },
+      "./helpers/typeof.js"
+    ],
+    "./helpers/esm/typeof": "./helpers/esm/typeof.js",
+    "./helpers/wrapRegExp": [
+      {
+        "node": "./helpers/wrapRegExp.js",
+        "import": "./helpers/esm/wrapRegExp.js",
+        "default": "./helpers/wrapRegExp.js"
+      },
+      "./helpers/wrapRegExp.js"
+    ],
+    "./helpers/esm/wrapRegExp": "./helpers/esm/wrapRegExp.js",
     "./helpers/asyncIterator": [
       {
         "node": "./helpers/asyncIterator.js",
@@ -162,15 +180,6 @@
       "./helpers/objectSpread.js"
     ],
     "./helpers/esm/objectSpread": "./helpers/esm/objectSpread.js",
-    "./helpers/objectSpread2": [
-      {
-        "node": "./helpers/objectSpread2.js",
-        "import": "./helpers/esm/objectSpread2.js",
-        "default": "./helpers/objectSpread2.js"
-      },
-      "./helpers/objectSpread2.js"
-    ],
-    "./helpers/esm/objectSpread2": "./helpers/esm/objectSpread2.js",
     "./helpers/inherits": [
       {
         "node": "./helpers/inherits.js",
@@ -801,15 +810,6 @@
       "./helpers/classPrivateMethodSet.js"
     ],
     "./helpers/esm/classPrivateMethodSet": "./helpers/esm/classPrivateMethodSet.js",
-    "./helpers/wrapRegExp": [
-      {
-        "node": "./helpers/wrapRegExp.js",
-        "import": "./helpers/esm/wrapRegExp.js",
-        "default": "./helpers/wrapRegExp.js"
-      },
-      "./helpers/wrapRegExp.js"
-    ],
-    "./helpers/esm/wrapRegExp": "./helpers/esm/wrapRegExp.js",
     "./package": "./package.json",
     "./package.json": "./package.json",
     "./regenerator": "./regenerator/index.js",
@@ -909,5 +909,8 @@
     "./core-js/reflect/set-prototype-of": "./core-js/reflect/set-prototype-of.js",
     "./core-js/reflect/set": "./core-js/reflect/set.js",
     "./core-js/date/now": "./core-js/date/now.js"
+  },
+  "engines": {
+    "node": ">=6.9.0"
   }
 }

@@ -3,12 +3,8 @@
 import * as N from "../types";
 import { types as tt, type TokenType } from "../tokenizer/types";
 import ExpressionParser from "./expression";
-import { Errors } from "./error";
-import {
-  isIdentifierChar,
-  isIdentifierStart,
-  keywordRelationalOperator,
-} from "../util/identifier";
+import { Errors, SourceTypeModuleErrors } from "./error";
+import { isIdentifierChar, isIdentifierStart } from "../util/identifier";
 import { lineBreak } from "../util/whitespace";
 import * as charCodes from "charcodes";
 import {
@@ -36,6 +32,8 @@ import {
   newParameterDeclarationScope,
 } from "../util/expression-scope";
 import type { SourceType } from "../options";
+import { Token } from "../tokenizer";
+import { Position } from "../util/location";
 
 const loopLabel = { kind: "loop" },
   switchLabel = { kind: "switch" };
@@ -47,6 +45,50 @@ const FUNC_NO_FLAGS = 0b000,
 
 const loneSurrogate = /[\uD800-\uDFFF]/u;
 
+const keywordRelationalOperator = /in(?:stanceof)?/y;
+
+/**
+ * Convert tt.privateName to tt.hash + tt.name for backward Babel 7 compat.
+ * For performance reasons this routine mutates `tokens`, it is okay
+ * here since we execute `parseTopLevel` once for every file.
+ * @param {*} tokens
+ * @returns
+ */
+function babel7CompatTokens(tokens) {
+  if (!process.env.BABEL_8_BREAKING) {
+    for (let i = 0; i < tokens.length; i++) {
+      const token = tokens[i];
+      if (token.type === tt.privateName) {
+        const { loc, start, value, end } = token;
+        const hashEndPos = start + 1;
+        const hashEndLoc = new Position(loc.start.line, loc.start.column + 1);
+        tokens.splice(
+          i,
+          1,
+          // $FlowIgnore: hacky way to create token
+          new Token({
+            type: tt.hash,
+            value: "#",
+            start: start,
+            end: hashEndPos,
+            startLoc: loc.start,
+            endLoc: hashEndLoc,
+          }),
+          // $FlowIgnore: hacky way to create token
+          new Token({
+            type: tt.name,
+            value: value,
+            start: hashEndPos,
+            end: end,
+            startLoc: hashEndLoc,
+            endLoc: loc.end,
+          }),
+        );
+      }
+    }
+  }
+  return tokens;
+}
 export default class StatementParser extends ExpressionParser {
   // ### Statement parsing
 
@@ -59,7 +101,7 @@ export default class StatementParser extends ExpressionParser {
     file.program = this.parseProgram(program);
     file.comments = this.state.comments;
 
-    if (this.options.tokens) file.tokens = this.tokens;
+    if (this.options.tokens) file.tokens = babel7CompatTokens(this.tokens);
 
     return this.finishNode(file, "File");
   }
@@ -88,26 +130,27 @@ export default class StatementParser extends ExpressionParser {
 
   // TODO
 
+  /**
+   * cast a Statement to a Directive. This method mutates input statement.
+   *
+   * @param {N.Statement} stmt
+   * @returns {N.Directive}
+   * @memberof StatementParser
+   */
   stmtToDirective(stmt: N.Statement): N.Directive {
-    const expr = stmt.expression;
+    const directive = (stmt: any);
+    directive.type = "Directive";
+    directive.value = directive.expression;
+    delete directive.expression;
 
-    const directiveLiteral = this.startNodeAt(expr.start, expr.loc.start);
-    const directive = this.startNodeAt(stmt.start, stmt.loc.start);
-
-    const raw = this.input.slice(expr.start, expr.end);
+    const directiveLiteral = directive.value;
+    const raw = this.input.slice(directiveLiteral.start, directiveLiteral.end);
     const val = (directiveLiteral.value = raw.slice(1, -1)); // remove quotes
 
     this.addExtra(directiveLiteral, "raw", raw);
     this.addExtra(directiveLiteral, "rawValue", val);
-
-    directive.value = this.finishNodeAt(
-      directiveLiteral,
-      "DirectiveLiteral",
-      expr.end,
-      expr.loc.end,
-    );
-
-    return this.finishNodeAt(directive, "Directive", stmt.end, stmt.loc.end);
+    directiveLiteral.type = "DirectiveLiteral";
+    return directive;
   }
 
   parseInterpreterDirective(): N.InterpreterDirective | null {
@@ -125,24 +168,48 @@ export default class StatementParser extends ExpressionParser {
     if (!this.isContextual("let")) {
       return false;
     }
+    return this.isLetKeyword(context);
+  }
+
+  /**
+   * Assuming we have seen a contextual `let`, check if it starts a variable declaration
+   so that `left` should be interpreted as a `let` keyword.
+   *
+   * @param {?string} context When `context` is non nullish, it will return early and _skip_ checking
+                              if the next token after `let` is `{` or a keyword relational operator
+   * @returns {boolean}
+   * @memberof StatementParser
+   */
+  isLetKeyword(context: ?string): boolean {
     const next = this.nextTokenStart();
-    const nextCh = this.input.charCodeAt(next);
+    const nextCh = this.codePointAtPos(next);
     // For ambiguous cases, determine if a LexicalDeclaration (or only a
     // Statement) is allowed here. If context is not empty then only a Statement
     // is allowed. However, `let [` is an explicit negative lookahead for
     // ExpressionStatement, so special-case it first.
-    if (nextCh === charCodes.leftSquareBracket) return true;
+    // Also, `let \` is never valid as an expression so this must be a keyword.
+    if (
+      nextCh === charCodes.backslash ||
+      nextCh === charCodes.leftSquareBracket
+    ) {
+      return true;
+    }
     if (context) return false;
 
     if (nextCh === charCodes.leftCurlyBrace) return true;
 
     if (isIdentifierStart(nextCh)) {
-      let pos = next + 1;
-      while (isIdentifierChar(this.input.charCodeAt(pos))) {
-        ++pos;
+      keywordRelationalOperator.lastIndex = next;
+      const matched = keywordRelationalOperator.exec(this.input);
+      if (matched !== null) {
+        // We have seen `in` or `instanceof` so far, now check if the identfier
+        // ends here
+        const endCh = this.codePointAtPos(next + matched[0].length);
+        if (!isIdentifierChar(endCh) && endCh !== charCodes.backslash) {
+          return false;
+        }
       }
-      const ident = this.input.slice(next, pos);
-      if (!keywordRelationalOperator.test(ident)) return true;
+      return true;
     }
     return false;
   }
@@ -311,20 +378,13 @@ export default class StatementParser extends ExpressionParser {
 
   assertModuleNodeAllowed(node: N.Node): void {
     if (!this.options.allowImportExportEverywhere && !this.inModule) {
-      this.raiseWithData(
-        node.start,
-        {
-          code: "BABEL_PARSER_SOURCETYPE_MODULE_REQUIRED",
-        },
-        Errors.ImportOutsideModule,
-      );
+      this.raise(node.start, SourceTypeModuleErrors.ImportOutsideModule);
     }
   }
 
   takeDecorators(node: N.HasDecorators): void {
-    const decorators = this.state.decoratorStack[
-      this.state.decoratorStack.length - 1
-    ];
+    const decorators =
+      this.state.decoratorStack[this.state.decoratorStack.length - 1];
     if (decorators.length) {
       node.decorators = decorators;
       this.resetStartLocationFromNode(node, decorators[0]);
@@ -337,9 +397,8 @@ export default class StatementParser extends ExpressionParser {
   }
 
   parseDecorators(allowExport?: boolean): void {
-    const currentContextDecorators = this.state.decoratorStack[
-      this.state.decoratorStack.length - 1
-    ];
+    const currentContextDecorators =
+      this.state.decoratorStack[this.state.decoratorStack.length - 1];
     while (this.match(tt.at)) {
       const decorator = this.parseDecorator();
       currentContextDecorators.push(decorator);
@@ -511,7 +570,8 @@ export default class StatementParser extends ExpressionParser {
       return this.parseFor(node, null);
     }
 
-    const isLet = this.isLet();
+    const startsWithLet = this.isContextual("let");
+    const isLet = startsWithLet && this.isLetKeyword();
     if (this.match(tt._var) || this.match(tt._const) || isLet) {
       const init = this.startNode();
       const kind = isLet ? "let" : this.state.value;
@@ -531,13 +591,35 @@ export default class StatementParser extends ExpressionParser {
       return this.parseFor(node, init);
     }
 
+    // Check whether the first token is possibly a contextual keyword, so that
+    // we can forbid `for (async of` if this turns out to be a for-of loop.
+    const startsWithUnescapedName =
+      this.match(tt.name) && !this.state.containsEsc;
+
     const refExpressionErrors = new ExpressionErrors();
     const init = this.parseExpression(true, refExpressionErrors);
-    if (this.match(tt._in) || this.isContextual("of")) {
+    const isForOf = this.isContextual("of");
+    if (isForOf) {
+      // Check for leading tokens that are forbidden in for-of loops:
+      if (startsWithLet) {
+        this.raise(init.start, Errors.ForOfLet);
+      } else if (
+        // `for await (async of []);` is allowed.
+        awaitAt === -1 &&
+        startsWithUnescapedName &&
+        init.type === "Identifier" &&
+        init.name === "async"
+      ) {
+        // This catches the case where the `async` in `for (async of` was
+        // parsed as an identifier. If it was parsed as the start of an async
+        // arrow function (e.g. `for (async of => {} of []);`), the LVal check
+        // further down will raise a more appropriate error.
+        this.raise(init.start, Errors.ForOfAsync);
+      }
+    }
+    if (isForOf || this.match(tt._in)) {
       this.toAssignable(init, /* isLHS */ true);
-      const description = this.isContextual("of")
-        ? "for-of statement"
-        : "for-in statement";
+      const description = isForOf ? "for-of statement" : "for-in statement";
       this.checkLVal(init, description);
       return this.parseForIn(node, init, awaitAt);
     } else {
@@ -1195,16 +1277,12 @@ export default class StatementParser extends ExpressionParser {
   }
 
   // https://tc39.es/ecma262/#prod-ClassBody
-  parseClassBody(
-    constructorAllowsSuper: boolean,
-    oldStrict: boolean,
-  ): N.ClassBody {
+  parseClassBody(hadSuperClass: boolean, oldStrict: boolean): N.ClassBody {
     this.classScope.enter();
 
     const state: N.ParseClassMemberState = {
-      constructorAllowsSuper,
       hadConstructor: false,
-      hadStaticBlock: false,
+      hadSuperClass,
     };
     let decorators: N.Decorator[] = [];
     const classBody: N.ClassBody = this.startNode();
@@ -1297,6 +1375,7 @@ export default class StatementParser extends ExpressionParser {
       classBody.body.push(this.parseClassProperty(prop));
       return true;
     }
+    this.resetPreviousNodeTrailingComments(key);
     return false;
   }
 
@@ -1313,11 +1392,7 @@ export default class StatementParser extends ExpressionParser {
         return;
       }
       if (this.eat(tt.braceL)) {
-        this.parseClassStaticBlock(
-          classBody,
-          ((member: any): N.StaticBlock),
-          state,
-        );
+        this.parseClassStaticBlock(classBody, ((member: any): N.StaticBlock));
         return;
       }
     }
@@ -1344,9 +1419,10 @@ export default class StatementParser extends ExpressionParser {
     if (this.eat(tt.star)) {
       // a generator
       method.kind = "method";
+      const isPrivateName = this.match(tt.privateName);
       this.parseClassElementName(method);
 
-      if (this.isPrivateName(method.key)) {
+      if (isPrivateName) {
         // Private generator method
         this.pushClassPrivateMethod(classBody, privateMethod, true, false);
         return;
@@ -1368,11 +1444,9 @@ export default class StatementParser extends ExpressionParser {
       return;
     }
 
-    const containsEsc = this.state.containsEsc;
+    const isContextual = this.match(tt.name) && !this.state.containsEsc;
+    const isPrivate = this.match(tt.privateName);
     const key = this.parseClassElementName(member);
-    const isPrivate = this.isPrivateName(key);
-    // Check the key is not a computed expression or string literal.
-    const isSimple = key.type === "Identifier";
     const maybeQuestionTokenStart = this.state.start;
 
     this.parsePostMemberNameModifiers(publicMember);
@@ -1395,8 +1469,11 @@ export default class StatementParser extends ExpressionParser {
         if (state.hadConstructor && !this.hasPlugin("typescript")) {
           this.raise(key.start, Errors.DuplicateConstructor);
         }
+        if (isConstructor && this.hasPlugin("typescript") && member.override) {
+          this.raise(key.start, Errors.OverrideOnConstructor);
+        }
         state.hadConstructor = true;
-        allowsDirectSuper = state.constructorAllowsSuper;
+        allowsDirectSuper = state.hadSuperClass;
       }
 
       this.pushClassMethod(
@@ -1414,12 +1491,12 @@ export default class StatementParser extends ExpressionParser {
         this.pushClassProperty(classBody, publicProp);
       }
     } else if (
-      isSimple &&
+      isContextual &&
       key.name === "async" &&
-      !containsEsc &&
       !this.isLineTerminator()
     ) {
       // an async method
+      this.resetPreviousNodeTrailingComments(key);
       const isGenerator = this.eat(tt.star);
 
       if (publicMember.optional) {
@@ -1428,10 +1505,11 @@ export default class StatementParser extends ExpressionParser {
 
       method.kind = "method";
       // The so-called parsed name would have been "async": get the real name.
+      const isPrivate = this.match(tt.privateName);
       this.parseClassElementName(method);
       this.parsePostMemberNameModifiers(publicMember);
 
-      if (this.isPrivateName(method.key)) {
+      if (isPrivate) {
         // private async method
         this.pushClassPrivateMethod(
           classBody,
@@ -1454,18 +1532,19 @@ export default class StatementParser extends ExpressionParser {
         );
       }
     } else if (
-      isSimple &&
+      isContextual &&
       (key.name === "get" || key.name === "set") &&
-      !containsEsc &&
       !(this.match(tt.star) && this.isLineTerminator())
     ) {
       // `get\n*` is an uninitialized property named 'get' followed by a generator.
       // a getter or setter
+      this.resetPreviousNodeTrailingComments(key);
       method.kind = key.name;
       // The so-called parsed name would have been "get/set": get the real name.
+      const isPrivate = this.match(tt.privateName);
       this.parseClassElementName(publicMethod);
 
-      if (this.isPrivateName(method.key)) {
+      if (isPrivate) {
         // private getter/setter
         this.pushClassPrivateMethod(classBody, privateMethod, false, false);
       } else {
@@ -1497,31 +1576,25 @@ export default class StatementParser extends ExpressionParser {
 
   // https://tc39.es/proposal-class-fields/#prod-ClassElementName
   parseClassElementName(member: N.ClassMember): N.Expression | N.Identifier {
-    const key = this.parsePropertyName(member, /* isPrivateNameAllowed */ true);
-
+    const { type, value, start } = this.state;
     if (
-      !member.computed &&
+      (type === tt.name || type === tt.string) &&
       member.static &&
-      ((key: $FlowSubtype<N.Identifier>).name === "prototype" ||
-        (key: $FlowSubtype<N.StringLiteral>).value === "prototype")
+      value === "prototype"
     ) {
-      this.raise(key.start, Errors.StaticPrototype);
+      this.raise(start, Errors.StaticPrototype);
     }
 
-    if (
-      this.isPrivateName(key) &&
-      this.getPrivateNameSV(key) === "constructor"
-    ) {
-      this.raise(key.start, Errors.ConstructorClassPrivateField);
+    if (type === tt.privateName && value === "constructor") {
+      this.raise(start, Errors.ConstructorClassPrivateField);
     }
 
-    return key;
+    return this.parsePropertyName(member, /* isPrivateNameAllowed */ true);
   }
 
   parseClassStaticBlock(
     classBody: N.ClassBody,
     member: N.StaticBlock & { decorators?: Array<N.Decorator> },
-    state: N.ParseClassMemberState,
   ) {
     this.expectPlugin("classStaticBlock", member.start);
     // Start a new lexical scope
@@ -1538,13 +1611,9 @@ export default class StatementParser extends ExpressionParser {
     this.scope.exit();
     this.state.labels = oldLabels;
     classBody.body.push(this.finishNode<N.StaticBlock>(member, "StaticBlock"));
-    if (state.hadStaticBlock) {
-      this.raise(member.start, Errors.DuplicateStaticBlock);
-    }
     if (member.decorators?.length) {
       this.raise(member.start, Errors.DecoratorStaticBlock);
     }
-    state.hadStaticBlock = true;
   }
 
   pushClassProperty(classBody: N.ClassBody, prop: N.ClassProperty) {
@@ -1564,8 +1633,6 @@ export default class StatementParser extends ExpressionParser {
     classBody: N.ClassBody,
     prop: N.ClassPrivateProperty,
   ) {
-    this.expectPlugin("classPrivateProperties", prop.key.start);
-
     const node = this.parseClassPrivateProperty(prop);
     classBody.body.push(node);
 
@@ -1603,8 +1670,6 @@ export default class StatementParser extends ExpressionParser {
     isGenerator: boolean,
     isAsync: boolean,
   ): void {
-    this.expectPlugin("classPrivateMethods", method.key.start);
-
     const node = this.parseMethod(
       method,
       isGenerator,
@@ -1650,9 +1715,6 @@ export default class StatementParser extends ExpressionParser {
 
   // https://tc39.es/proposal-class-fields/#prod-FieldDefinition
   parseClassProperty(node: N.ClassProperty): N.ClassProperty {
-    if (!node.typeAnnotation || this.match(tt.eq)) {
-      this.expectPlugin("classProperties");
-    }
     this.parseInitializer(node);
     this.semicolon();
     return this.finishNode(node, "ClassProperty");
@@ -1979,7 +2041,7 @@ export default class StatementParser extends ExpressionParser {
           // $FlowIgnore
           if (!isFrom && specifier.local) {
             const { local } = specifier;
-            if (local.type === "StringLiteral") {
+            if (local.type !== "Identifier") {
               this.raise(
                 specifier.start,
                 Errors.ExportBindingIsString,
@@ -2012,9 +2074,8 @@ export default class StatementParser extends ExpressionParser {
       }
     }
 
-    const currentContextDecorators = this.state.decoratorStack[
-      this.state.decoratorStack.length - 1
-    ];
+    const currentContextDecorators =
+      this.state.decoratorStack[this.state.decoratorStack.length - 1];
     // If node.declaration is a class, it will take all decorators in the current context.
     // Thus we should throw if we see non-empty decorators here.
     if (currentContextDecorators.length) {
@@ -2053,7 +2114,7 @@ export default class StatementParser extends ExpressionParser {
       | N.ExportDefaultSpecifier,
     name: string,
   ): void {
-    if (this.state.exportedIdentifiers.indexOf(name) > -1) {
+    if (this.exportedIdentifiers.has(name)) {
       this.raise(
         node.start,
         name === "default"
@@ -2062,7 +2123,7 @@ export default class StatementParser extends ExpressionParser {
         name,
       );
     }
-    this.state.exportedIdentifiers.push(name);
+    this.exportedIdentifiers.add(name);
   }
 
   // Parses a comma-separated list of module exports.
@@ -2096,11 +2157,7 @@ export default class StatementParser extends ExpressionParser {
   // https://tc39.es/ecma262/#prod-ModuleExportName
   parseModuleExportName(): N.StringLiteral | N.Identifier {
     if (this.match(tt.string)) {
-      this.expectPlugin("moduleStringNames");
-      const result = this.parseLiteral<N.StringLiteral>(
-        this.state.value,
-        "StringLiteral",
-      );
+      const result = this.parseStringLiteral(this.state.value);
       const surrogate = result.value.match(loneSurrogate);
       if (surrogate) {
         this.raise(
@@ -2146,9 +2203,7 @@ export default class StatementParser extends ExpressionParser {
     const assertions = this.maybeParseImportAssertions();
     if (assertions) {
       node.assertions = assertions;
-    }
-    // todo(Babel 8): remove module attributes support
-    else {
+    } else if (!process.env.BABEL_8_BREAKING) {
       const attributes = this.maybeParseModuleAttributes();
       if (attributes) {
         node.attributes = attributes;
@@ -2200,32 +2255,23 @@ export default class StatementParser extends ExpressionParser {
 
       // parse AssertionKey : IdentifierName, StringLiteral
       const keyName = this.state.value;
-      if (this.match(tt.string)) {
-        node.key = this.parseLiteral<N.StringLiteral>(keyName, "StringLiteral");
-      } else {
-        node.key = this.parseIdentifier(true);
-      }
-      this.expect(tt.colon);
-
-      // for now we are only allowing `type` as the only allowed module attribute
-      if (keyName !== "type") {
-        this.raise(
-          node.key.start,
-          Errors.ModuleAttributeDifferentFromType,
-          keyName,
-        );
-      }
       // check if we already have an entry for an attribute
       // if a duplicate entry is found, throw an error
       // for now this logic will come into play only when someone declares `type` twice
       if (attrNames.has(keyName)) {
         this.raise(
-          node.key.start,
+          this.state.start,
           Errors.ModuleAttributesWithDuplicateKeys,
           keyName,
         );
       }
       attrNames.add(keyName);
+      if (this.match(tt.string)) {
+        node.key = this.parseStringLiteral(keyName);
+      } else {
+        node.key = this.parseIdentifier(true);
+      }
+      this.expect(tt.colon);
 
       if (!this.match(tt.string)) {
         throw this.unexpected(
@@ -2233,10 +2279,7 @@ export default class StatementParser extends ExpressionParser {
           Errors.ModuleAttributeInvalidValue,
         );
       }
-      node.value = this.parseLiteral<N.StringLiteral>(
-        this.state.value,
-        "StringLiteral",
-      );
+      node.value = this.parseStringLiteral(this.state.value);
       this.finishNode<N.ImportAttribute>(node, "ImportAttribute");
       attrs.push(node);
     } while (this.eat(tt.comma));
@@ -2287,7 +2330,7 @@ export default class StatementParser extends ExpressionParser {
           Errors.ModuleAttributeInvalidValue,
         );
       }
-      node.value = this.parseLiteral(this.state.value, "StringLiteral");
+      node.value = this.parseStringLiteral(this.state.value);
       this.finishNode(node, "ImportAttribute");
       attrs.push(node);
     } while (this.eat(tt.comma));
@@ -2366,12 +2409,13 @@ export default class StatementParser extends ExpressionParser {
   // https://tc39.es/ecma262/#prod-ImportSpecifier
   parseImportSpecifier(node: N.ImportDeclaration): void {
     const specifier = this.startNode();
+    const importedIsString = this.match(tt.string);
     specifier.imported = this.parseModuleExportName();
     if (this.eatContextual("as")) {
       specifier.local = this.parseIdentifier();
     } else {
       const { imported } = specifier;
-      if (imported.type === "StringLiteral") {
+      if (importedIsString) {
         throw this.raise(
           specifier.start,
           Errors.ImportBindingIsString,
@@ -2383,5 +2427,13 @@ export default class StatementParser extends ExpressionParser {
     }
     this.checkLVal(specifier.local, "import specifier", BIND_LEXICAL);
     node.specifiers.push(this.finishNode(specifier, "ImportSpecifier"));
+  }
+
+  // This is used in flow and typescript plugin
+  // Determine whether a parameter is a this param
+  isThisParam(
+    param: N.Pattern | N.Identifier | N.TSParameterProperty,
+  ): boolean {
+    return param.type === "Identifier" && param.name === "this";
   }
 }

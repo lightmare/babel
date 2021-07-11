@@ -2,11 +2,12 @@
 
 import type { Options } from "../options";
 import * as N from "../types";
+import type { CommentWhitespace } from "../parser/comments";
 import { Position } from "../util/location";
 
 import { types as ct, type TokContext } from "./context";
 import { types as tt, type TokenType } from "./types";
-import type { ParsingError } from "../parser/error";
+import type { ParsingError, ErrorTemplate } from "../parser/error";
 
 type TopicContextState = {
   // When a topic binding has been currently established,
@@ -64,8 +65,7 @@ export default class State {
   noAnonFunctionType: boolean = false;
   inPropertyName: boolean = false;
   hasFlowComment: boolean = false;
-  isIterator: boolean = false;
-  isDeclareContext: boolean = false;
+  isAmbientContext: boolean = false;
   inAbstractClass: boolean = false;
 
   // For the smartPipelines plugin:
@@ -90,20 +90,11 @@ export default class State {
   // where @foo belongs to the outer class and @bar to the inner
   decoratorStack: Array<Array<N.Decorator>> = [[]];
 
-  // Comment store.
+  // Comment store for Program.comments
   comments: Array<N.Comment> = [];
 
   // Comment attachment store
-  trailingComments: Array<N.Comment> = [];
-  leadingComments: Array<N.Comment> = [];
-  commentStack: Array<{
-    start: number,
-    leadingComments: ?Array<N.Comment>,
-    trailingComments: ?Array<N.Comment>,
-    type: string,
-  }> = [];
-  // $FlowIgnore this is initialized when the parser starts.
-  commentPreviousNode: N.Node = null;
+  commentStack: Array<CommentWhitespace> = [];
 
   // The current position of the tokenizer in the input.
   pos: number = 0;
@@ -128,10 +119,10 @@ export default class State {
   lastTokStart: number = 0;
   lastTokEnd: number = 0;
 
-  // The context stack is used to superficially track syntactic
-  // context to predict whether a regular expression is allowed in a
-  // given position.
-  context: Array<TokContext> = [ct.braceStatement];
+  // The context stack is used to track whether the apostrophe "`" starts
+  // or ends a string template
+  context: Array<TokContext> = [ct.brace];
+  // Used to track whether a JSX element is allowed to form
   exprAllowed: boolean = true;
 
   // Used to signal to callers of `readWord1` whether the word
@@ -147,11 +138,7 @@ export default class State {
 
   // todo(JLHwung): set strictErrors to null and avoid recording string errors
   // after a non-directive is parsed
-  strictErrors: Map<number, string> = new Map();
-
-  // Names of exports store. `default` is stored as a name for both
-  // `export default foo;` and `export { foo as default };`.
-  exportedIdentifiers: Array<string> = [];
+  strictErrors: Map<number, ErrorTemplate> = new Map();
 
   // Tokens length in token store
   tokensLength: number = 0;
@@ -179,3 +166,13 @@ export default class State {
     return state;
   }
 }
+
+export type LookaheadState = {
+  pos: number,
+  value: any,
+  type: TokenType,
+  start: number,
+  end: number,
+  /* Used only in readToken_mult_modulo */
+  inType: boolean,
+};

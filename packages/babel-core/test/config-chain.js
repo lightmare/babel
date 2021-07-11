@@ -2,8 +2,8 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
-import escapeRegExp from "lodash/escapeRegExp";
 import * as babel from "../lib";
+import getTargets from "@babel/helper-compilation-targets";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -60,6 +60,10 @@ function pairs(items) {
     }
   }
   return pairs;
+}
+
+function escapeRegExp(string) {
+  return string.replace(/[|\\{}()[\]^$+*?.]/g, "\\$&");
 }
 
 async function getTemp(name) {
@@ -976,18 +980,20 @@ describe("buildConfigChain", function () {
   });
 
   describe("config files", () => {
+    const defaultTargets = getTargets();
     const getDefaults = () => ({
       babelrc: false,
       configFile: false,
       browserslistConfigFile: false,
       cwd: process.cwd(),
       root: process.cwd(),
+      rootMode: "root",
       envName: "development",
       passPerPreset: false,
       plugins: [],
       presets: [],
       cloneInputAst: true,
-      targets: {},
+      targets: defaultTargets,
       assumptions: {},
     });
     const realEnv = process.env.NODE_ENV;

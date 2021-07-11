@@ -95,6 +95,7 @@ export default declare((api, opts) => {
     const props = path.node.properties;
     const keys = [];
     let allLiteral = true;
+    let hasTemplateLiteral = false;
 
     for (const prop of props) {
       if (t.isIdentifier(prop.key) && !prop.computed) {
@@ -102,6 +103,7 @@ export default declare((api, opts) => {
         keys.push(t.stringLiteral(prop.key.name));
       } else if (t.isTemplateLiteral(prop.key)) {
         keys.push(t.cloneNode(prop.key));
+        hasTemplateLiteral = true;
       } else if (t.isLiteral(prop.key)) {
         keys.push(t.stringLiteral(String(prop.key.value)));
       } else {
@@ -110,7 +112,7 @@ export default declare((api, opts) => {
       }
     }
 
-    return { keys, allLiteral };
+    return { keys, allLiteral, hasTemplateLiteral };
   }
 
   // replaces impure computed keys with new identifiers
@@ -156,7 +158,8 @@ export default declare((api, opts) => {
       path.get("properties"),
       path.scope,
     );
-    const { keys, allLiteral } = extractNormalizedKeys(path);
+    const { keys, allLiteral, hasTemplateLiteral } =
+      extractNormalizedKeys(path);
 
     if (keys.length === 0) {
       return [
@@ -178,6 +181,20 @@ export default declare((api, opts) => {
       );
     } else {
       keyExpression = t.arrayExpression(keys);
+
+      if (!hasTemplateLiteral && !t.isProgram(path.scope.block)) {
+        // Hoist definition of excluded keys, so that it's not created each time.
+        const program = path.findParent(path => path.isProgram());
+        const id = path.scope.generateUidIdentifier("excluded");
+
+        program.scope.push({
+          id,
+          init: keyExpression,
+          kind: "const",
+        });
+
+        keyExpression = t.cloneNode(id);
+      }
     }
 
     return [
@@ -225,7 +242,7 @@ export default declare((api, opts) => {
 
   return {
     name: "proposal-object-rest-spread",
-    inherits: syntaxObjectRestSpread,
+    inherits: syntaxObjectRestSpread.default,
 
     visitor: {
       // function a({ b, ...c }) {}
@@ -371,11 +388,8 @@ export default declare((api, opts) => {
             path.isObjectPattern(),
           );
 
-          const [
-            impureComputedPropertyDeclarators,
-            argument,
-            callExpression,
-          ] = createObjectRest(objectPatternPath, file, ref);
+          const [impureComputedPropertyDeclarators, argument, callExpression] =
+            createObjectRest(objectPatternPath, file, ref);
 
           if (pureGetters) {
             removeUnusedExcludedKeys(objectPatternPath);
@@ -454,11 +468,8 @@ export default declare((api, opts) => {
             ]),
           );
 
-          const [
-            impureComputedPropertyDeclarators,
-            argument,
-            callExpression,
-          ] = createObjectRest(leftPath, file, t.identifier(refName));
+          const [impureComputedPropertyDeclarators, argument, callExpression] =
+            createObjectRest(leftPath, file, t.identifier(refName));
 
           if (impureComputedPropertyDeclarators.length > 0) {
             nodes.push(

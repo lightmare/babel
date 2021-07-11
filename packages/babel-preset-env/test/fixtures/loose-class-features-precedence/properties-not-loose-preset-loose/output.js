@@ -1,4 +1,4 @@
-var _foo = new WeakSet();
+var _foo = /*#__PURE__*/new WeakSet();
 
 class A {
   constructor() {
@@ -9,4 +9,4 @@ class A {
 
 }
 
-var _foo2 = function _foo2() {};
+function _foo2() {}
