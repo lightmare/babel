@@ -1,5 +1,5 @@
 import { declare } from "@babel/helper-plugin-utils";
-import { skipTransparentExprWrappers } from "@babel/helper-skip-transparent-expression-wrappers";
+import { skipTransparentExprWrapperNodes } from "@babel/helper-skip-transparent-expression-wrappers";
 import { types as t, File } from "@babel/core";
 import type { NodePath, Scope } from "@babel/traverse";
 
@@ -128,10 +128,9 @@ export default declare((api, options) => {
 
         const args = node.arguments as Array<ListElement>;
         if (!hasSpread(args)) return;
-        const calleePath = skipTransparentExprWrappers(
-          path.get("callee") as NodePath<t.Expression>,
-        );
-        if (calleePath.isSuper()) {
+
+        const callee = skipTransparentExprWrapperNodes(node.callee);
+        if (t.isSuper(callee)) {
           // NOTE: spread and classes have almost the same compat data, so this is very unlikely to happen in practice.
           throw path.buildCodeFrameError(
             "It's not possible to compile spread arguments in `super()` without compiling classes.\n" +
@@ -165,9 +164,7 @@ export default declare((api, options) => {
           node.arguments.push(first);
         }
 
-        const callee = calleePath.node as t.MemberExpression;
-
-        if (calleePath.isMemberExpression()) {
+        if (t.isMemberExpression(callee)) {
           const temp = scope.maybeGenerateMemoised(callee.object);
           if (temp) {
             callee.object = t.assignmentExpression("=", temp, callee.object);
