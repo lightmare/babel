@@ -1,4 +1,4 @@
-import { skipTransparentExprWrappers } from "@babel/helper-skip-transparent-expression-wrappers";
+import { skipTransparentExprWrapperNodes } from "@babel/helper-skip-transparent-expression-wrappers";
 import type { NodePath } from "@babel/traverse";
 import { types as t } from "@babel/core";
 // https://crbug.com/v8/11558
@@ -22,38 +22,25 @@ function matchAffectedArguments(argumentNodes) {
 export function shouldTransform(
   path: NodePath<t.OptionalMemberExpression | t.OptionalCallExpression>,
 ): boolean {
-  let optionalPath: NodePath<t.Expression> = path;
-  const chains = [];
-  while (
-    optionalPath.isOptionalMemberExpression() ||
-    optionalPath.isOptionalCallExpression()
-  ) {
-    const { node } = optionalPath;
-    chains.push(node);
-
-    if (optionalPath.isOptionalMemberExpression()) {
-      optionalPath = skipTransparentExprWrappers(optionalPath.get("object"));
-    } else if (optionalPath.isOptionalCallExpression()) {
-      optionalPath = skipTransparentExprWrappers(optionalPath.get("callee"));
-    }
-  }
-  for (let i = 0; i < chains.length; i++) {
-    const node = chains[i];
-    if (
-      t.isOptionalCallExpression(node) &&
-      matchAffectedArguments(node.arguments)
-    ) {
+  let node: t.Expression = path.node;
+  let affected = false;
+  for (;;) {
+    if (t.isOptionalCallExpression(node)) {
+      affected = matchAffectedArguments(node.arguments);
       // f?.(...[], 0)
-      if (node.optional) {
+      if (affected && node.optional) {
         return true;
       }
+      node = skipTransparentExprWrapperNodes(node.callee);
+    } else if (t.isOptionalMemberExpression(node)) {
       // o?.m(...[], 0)
-      // when node.optional is false, chains[i + 1] is always well defined
-      const callee = chains[i + 1];
-      if (t.isOptionalMemberExpression(callee, { optional: true })) {
+      if (affected && node.optional) {
         return true;
       }
+      affected = false;
+      node = skipTransparentExprWrapperNodes(node.object);
+    } else {
+      return false;
     }
   }
-  return false;
 }
