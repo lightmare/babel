@@ -1,3 +1,5 @@
+"@babel noLiveExports";
+
 import isReactComponent from "./validators/react/isReactComponent";
 import isCompatTag from "./validators/react/isCompatTag";
 import buildChildren from "./builders/react/buildChildren";

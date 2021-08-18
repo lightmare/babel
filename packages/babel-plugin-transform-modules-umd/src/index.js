@@ -207,13 +207,7 @@ export default declare((api, options) => {
               }
             }
 
-            headers.push(
-              ...buildNamespaceInitStatements(
-                meta,
-                metadata,
-                constantReexports,
-              ),
-            );
+            headers.push(...buildNamespaceInitStatements(meta, metadata));
           }
 
           ensureStatementsHoisted(headers);

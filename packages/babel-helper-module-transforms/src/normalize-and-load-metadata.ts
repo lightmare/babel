@@ -19,6 +19,10 @@ export interface ModuleMetadata {
   // `stringSpecifiers` is Set(1) ["any unicode"]
   // In most cases `stringSpecifiers` is an empty Set
   stringSpecifiers: Set<string>;
+  // Flag indicating presence of "@babel noLiveExports" directive.
+  noLiveExports: boolean;
+  // Flag indicating whether re-exports should be initialized once.
+  initializeReexports: boolean;
 }
 
 export type InteropType =
@@ -105,7 +109,7 @@ export default function normalizeModuleAndLoadMetadata(
   exportName: string,
   {
     importInterop,
-    initializeReexports = false,
+    constantReexports = false,
     lazy = false,
     esNamespaceOnly = false,
   },
@@ -114,6 +118,8 @@ export default function normalizeModuleAndLoadMetadata(
     exportName = programPath.scope.generateUidIdentifier("exports").name;
   }
   const stringSpecifiers = new Set<string>();
+  const noLiveExports = removeDirective(programPath, "@babel noLiveExports");
+  const initializeReexports = constantReexports || noLiveExports;
 
   nameAnonymousExports(programPath);
 
@@ -161,6 +167,8 @@ export default function normalizeModuleAndLoadMetadata(
     local,
     source,
     stringSpecifiers,
+    noLiveExports,
+    initializeReexports,
   };
 }
 
@@ -534,6 +542,20 @@ function nameAnonymousExports(programPath: NodePath<t.Program>) {
     if (!child.isExportDefaultDeclaration()) return;
     splitExportDeclaration(child);
   });
+}
+
+function removeDirective(
+  programPath: NodePath<t.Program>,
+  directive: string,
+): boolean {
+  let result = false;
+  programPath.get("directives").forEach(child => {
+    if (child.node.value.value === directive) {
+      child.remove();
+      result = true;
+    }
+  });
+  return result;
 }
 
 function removeModuleDeclarations(programPath: NodePath<t.Program>) {

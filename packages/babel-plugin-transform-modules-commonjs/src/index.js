@@ -223,13 +223,7 @@ export default declare((api, options) => {
             header.loc = metadata.loc;
 
             headers.push(header);
-            headers.push(
-              ...buildNamespaceInitStatements(
-                meta,
-                metadata,
-                constantReexports,
-              ),
-            );
+            headers.push(...buildNamespaceInitStatements(meta, metadata));
           }
 
           ensureStatementsHoisted(headers);

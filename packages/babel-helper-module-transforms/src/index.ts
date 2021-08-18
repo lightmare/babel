@@ -67,7 +67,7 @@ export function rewriteModuleStatementsAndPrepareHeader(
 
   const meta = normalizeModuleAndLoadMetadata(path, exportName, {
     importInterop,
-    initializeReexports: constantReexports,
+    constantReexports,
     lazy,
     esNamespaceOnly,
   });
@@ -107,7 +107,6 @@ export function rewriteModuleStatementsAndPrepareHeader(
     ...buildExportInitializationStatements(
       path,
       meta,
-      constantReexports,
       noIncompleteNsImportDetection,
     ),
   );
@@ -169,7 +168,6 @@ export function wrapInterop(
 export function buildNamespaceInitStatements(
   metadata: ModuleMetadata,
   sourceMetadata: SourceModuleMetadata,
-  constantReexports: boolean = false,
 ) {
   const statements = [];
 
@@ -187,7 +185,7 @@ export function buildNamespaceInitStatements(
       }),
     );
   }
-  if (constantReexports) {
+  if (metadata.initializeReexports) {
     statements.push(...buildReexportsFromMeta(metadata, sourceMetadata, true));
   }
   for (const exportName of sourceMetadata.reexportNamespace) {
@@ -213,7 +211,6 @@ export function buildNamespaceInitStatements(
     const statement = buildNamespaceReexport(
       metadata,
       t.cloneNode(srcNamespace),
-      constantReexports,
     );
     statement.loc = sourceMetadata.reexportAll.loc;
 
@@ -239,13 +236,13 @@ const ReexportTemplate = {
 const buildReexportsFromMeta = (
   meta: ModuleMetadata,
   metadata: SourceModuleMetadata,
-  constantReexports: boolean,
 ) => {
   const namespace = metadata.lazy
     ? t.callExpression(t.identifier(metadata.name), [])
     : t.identifier(metadata.name);
 
-  const { stringSpecifiers } = meta;
+  const { stringSpecifiers, initializeReexports } = meta;
+
   return Array.from(metadata.reexports, ([exportName, importName]) => {
     let NAMESPACE_IMPORT: t.Expression = t.cloneNode(namespace);
     if (importName === "default" && metadata.interop === "node-default") {
@@ -267,7 +264,7 @@ const buildReexportsFromMeta = (
       EXPORT_NAME: exportName,
       NAMESPACE_IMPORT,
     };
-    if (constantReexports || t.isIdentifier(NAMESPACE_IMPORT)) {
+    if (initializeReexports || t.isIdentifier(NAMESPACE_IMPORT)) {
       if (stringSpecifiers.has(exportName)) {
         return ReexportTemplate.constantComputed(astNodes);
       } else {
@@ -302,9 +299,9 @@ function buildESModuleHeader(
 /**
  * Create a re-export initialization loop for a specific imported namespace.
  */
-function buildNamespaceReexport(metadata, namespace, constantReexports) {
+function buildNamespaceReexport(metadata, namespace) {
   return (
-    constantReexports
+    metadata.initializeReexports
       ? template.statement`
         Object.keys(NAMESPACE).forEach(function(key) {
           if (key === "default" || key === "__esModule") return;
@@ -394,7 +391,6 @@ function buildExportNameListDeclaration(
 function buildExportInitializationStatements(
   programPath: NodePath,
   metadata: ModuleMetadata,
-  constantReexports: boolean = false,
   noIncompleteNsImportDetection = false,
 ) {
   const initStatements = [];
@@ -413,7 +409,7 @@ function buildExportInitializationStatements(
   }
 
   for (const data of metadata.source.values()) {
-    if (!constantReexports) {
+    if (!metadata.initializeReexports) {
       initStatements.push(...buildReexportsFromMeta(metadata, data, false));
     }
     for (const exportName of data.reexportNamespace) {
