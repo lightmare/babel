@@ -93,6 +93,13 @@ export function rewriteModuleStatementsAndPrepareHeader(
   const headers = [];
   if (hasExports(meta) && !strict) {
     headers.push(buildESModuleHeader(meta, enumerableModuleMeta));
+    if (meta.noLiveExports) {
+      headers.push(
+        template.statement`
+          Object.defineProperty(EXPORTS, "__babel_noLiveExports", { value: true })
+        `({ EXPORTS: meta.exportName }),
+      );
+    }
   }
 
   const nameList = buildExportNameListDeclaration(path, meta);
@@ -304,7 +311,7 @@ function buildNamespaceReexport(metadata, namespace) {
     metadata.initializeReexports
       ? template.statement`
         Object.keys(NAMESPACE).forEach(function(key) {
-          if (key === "default" || key === "__esModule") return;
+          if (key === "default" || key === "__esModule" || key === "__babel_noLiveExports") return;
           VERIFY_NAME_LIST;
           if (key in EXPORTS && EXPORTS[key] === NAMESPACE[key]) return;
 
@@ -319,8 +326,12 @@ function buildNamespaceReexport(metadata, namespace) {
         // (the spec requires an "ambigous bindings" early error here).
         template.statement`
         Object.keys(NAMESPACE).forEach(function(key) {
-          if (key === "default" || key === "__esModule") return;
+          if (key === "default" || key === "__esModule" || key === "__babel_noLiveExports") return;
           VERIFY_NAME_LIST;
+          if (NAMESPACE.__babel_noLiveExports) {
+            EXPORTS[key] = NAMESPACE[key];
+            return;
+          }
           if (key in EXPORTS && EXPORTS[key] === NAMESPACE[key]) return;
 
           Object.defineProperty(EXPORTS, key, {
