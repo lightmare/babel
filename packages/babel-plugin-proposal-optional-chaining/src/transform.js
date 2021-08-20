@@ -24,22 +24,17 @@ function isSimpleMemberExpression(expression) {
  * @returns {boolean}
  */
 function needsMemoize(path) {
-  let optionalPath = path;
-  const { scope } = path;
-  while (
-    optionalPath.isOptionalMemberExpression() ||
-    optionalPath.isOptionalCallExpression()
-  ) {
-    const { node } = optionalPath;
-    const childKey = optionalPath.isOptionalMemberExpression()
-      ? "object"
-      : "callee";
-    const childPath = skipTransparentExprWrappers(optionalPath.get(childKey));
-    if (node.optional) {
-      return !scope.isStatic(childPath.node);
+  for (let child, { node } = path; ; node = child) {
+    if (t.isOptionalMemberExpression(node)) {
+      child = skipTransparentExprWrapperNodes(node.object);
+    } else if (t.isOptionalCallExpression(node)) {
+      child = skipTransparentExprWrapperNodes(node.callee);
+    } else {
+      return false;
     }
-
-    optionalPath = childPath;
+    if (node.optional) {
+      return !path.scope.isStatic(child);
+    }
   }
 }
 
@@ -63,32 +58,29 @@ export function transform(
     // otherwise the parentPath should be an OptionalCallExpression
     path.isOptionalMemberExpression();
 
-  const optionals = [];
-
-  let optionalPath = path;
   // Replace `function (a, x = a.b?.c) {}` to `function (a, x = (() => a.b?.c)() ){}`
   // so the temporary variable can be injected in correct scope
-  if (scope.path.isPattern() && needsMemoize(optionalPath)) {
+  if (scope.path.isPattern() && needsMemoize(path)) {
     path.replaceWith(template.ast`(() => ${path.node})()`);
     // The injected optional chain will be queued and eventually transformed when visited
     return;
   }
-  while (
-    optionalPath.isOptionalMemberExpression() ||
-    optionalPath.isOptionalCallExpression()
-  ) {
-    const { node } = optionalPath;
+
+  const optionals = [];
+  for (let child, { node } = path; ; ) {
+    if (t.isOptionalMemberExpression(node)) {
+      node.type = "MemberExpression";
+      child = node.object;
+    } else if (t.isOptionalCallExpression(node)) {
+      node.type = "CallExpression";
+      child = node.callee;
+    } else {
+      break;
+    }
     if (node.optional) {
       optionals.push(node);
     }
-
-    if (optionalPath.isOptionalMemberExpression()) {
-      optionalPath.node.type = "MemberExpression";
-      optionalPath = skipTransparentExprWrappers(optionalPath.get("object"));
-    } else if (optionalPath.isOptionalCallExpression()) {
-      optionalPath.node.type = "CallExpression";
-      optionalPath = skipTransparentExprWrappers(optionalPath.get("callee"));
-    }
+    node = skipTransparentExprWrapperNodes(child);
   }
 
   let replacementPath = path;
